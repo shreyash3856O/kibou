@@ -1,7 +1,7 @@
 {
-  "name": "seeker",
+  "name": "kibou",
   "version": "1.0.0",
-  "description": "Seeker - Anonymous Peer Mental Health & Support Platform",
+  "description": "Kibou - Anonymous Peer Mental Health & Support Platform",
   "main": "server/src/index.js",
   "scripts": {
     "postinstall": "npm run install:all",

@@ -7,11 +7,11 @@ import { getSocket } from '../services/socket';
 export default function AdminPanel() {
   const { adminUser, loginAdminSuccess, logoutAdmin } = useApp();
 
-  // Login form state
-  const [email, setEmail] = useState('counselor@school.edu');
-  const [password, setPassword] = useState('AdminPass123!');
+  // Login form state (empty by default so user types their credentials)
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [twoFaStep, setTwoFaStep] = useState(false);
-  const [twoFaCode, setTwoFaCode] = useState('123456');
+  const [twoFaCode, setTwoFaCode] = useState('');
   const [adminIdFor2fa, setAdminIdFor2fa] = useState('');
   const [authError, setAuthError] = useState('');
 
@@ -215,20 +215,35 @@ export default function AdminPanel() {
             <form onSubmit={handleLoginSubmit}>
               <div style={{ marginBottom: '12px' }}>
                 <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '600', marginBottom: '4px' }}>Email:</label>
-                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="input-text" required />
+                <input
+                  type="email"
+                  placeholder="counselor@school.edu"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="input-text"
+                  required
+                />
               </div>
               <div style={{ marginBottom: '16px' }}>
                 <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '600', marginBottom: '4px' }}>Password:</label>
-                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="input-text" required />
+                <input
+                  type="password"
+                  placeholder="Enter password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="input-text"
+                  required
+                />
               </div>
               <button type="submit" className="btn btn-primary btn-block">Continue to 2FA</button>
             </form>
           ) : (
             <form onSubmit={handle2faSubmit}>
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '600', marginBottom: '4px' }}>6-Digit Code:</label>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '600', marginBottom: '4px' }}>6-Digit 2FA Code:</label>
                 <input
                   type="text"
+                  placeholder="123456"
                   value={twoFaCode}
                   onChange={(e) => setTwoFaCode(e.target.value)}
                   className="input-text"

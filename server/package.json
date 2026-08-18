@@ -1,7 +1,7 @@
 {
-  "name": "seeker-server",
+  "name": "kibou-server",
   "version": "1.0.0",
-  "description": "Seeker - Anonymous Peer Mental Health Platform Server",
+  "description": "Kibou - Anonymous Peer Mental Health Platform Server",
   "main": "src/index.js",
   "type": "module",
   "scripts": {

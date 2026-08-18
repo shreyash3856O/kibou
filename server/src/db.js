@@ -247,7 +247,7 @@ export async function initializeDatabase() {
   if (!existingAdmin) {
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash('AdminPass123!', salt);
-    const secret = speakeasy.generateSecret({ length: 20, name: 'Seeker Admin' });
+    const secret = speakeasy.generateSecret({ length: 20, name: 'Kibou Admin' });
 
     const adminUser = {
       admin_id: uuidv4(),

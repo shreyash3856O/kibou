@@ -10,7 +10,7 @@ export default function Header() {
         onClick={() => { if (!adminUser) setCurrentView('main'); }}
         style={{ cursor: adminUser ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
       >
-        <span className="brand-title">Seeker</span>
+        <span className="brand-title">Kibou</span>
       </div>
 
       {/* Show Seeker/Helper tabs only when NOT admin and on main view */}

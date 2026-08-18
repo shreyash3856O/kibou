@@ -39,7 +39,7 @@ app.use('/api', apiRouter);
 app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
-    platform: 'Seeker',
+    platform: 'Kibou',
     environment: process.env.NODE_ENV || 'development',
     timestamp: new Date().toISOString()
   });
@@ -74,7 +74,7 @@ async function startServer() {
   await initializeDatabase();
   server.listen(PORT, '0.0.0.0', () => {
     console.log(`=========================================`);
-    console.log(`🌿 Seeker Platform listening on port ${PORT}`);
+    console.log(`🌿 Kibou Platform listening on port ${PORT}`);
     console.log(`🔒 Encryption: AES-256-CBC`);
     console.log(`🛡️ Real-Time Crisis Detection: Active`);
     console.log(`🩺 Counselor Login: counselor@school.edu / AdminPass123!`);
