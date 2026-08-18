@@ -4,6 +4,7 @@
   "description": "Seeker - Anonymous Peer Mental Health & Support Platform",
   "main": "server/src/index.js",
   "scripts": {
+    "postinstall": "npm run install:all",
     "install:all": "npm --prefix server install && npm --prefix client install",
     "build": "npm --prefix client run build",
     "start": "node server/src/index.js",
