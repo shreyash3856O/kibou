@@ -1,0 +1,15 @@
+{
+  "name": "seeker",
+  "version": "1.0.0",
+  "description": "Seeker - Anonymous Peer Mental Health & Support Platform",
+  "main": "server/src/index.js",
+  "scripts": {
+    "install:all": "npm --prefix server install && npm --prefix client install",
+    "build": "npm --prefix client run build",
+    "start": "node server/src/index.js",
+    "server": "npm --prefix server run dev",
+    "client": "npm --prefix client run dev",
+    "dev": "node --watch server/src/index.js",
+    "test": "node server/test-seeker.js"
+  }
+}
