@@ -209,7 +209,9 @@ export function setupSocketIO(io) {
 
           setTimeout(async () => {
             try {
-              const sukhiReply = await getSukhiResponse(content, decryptedHistory);
+              const conv = findConversationById(conversation_id);
+              const convTopic = conv?.topic || '';
+              const sukhiReply = await getSukhiResponse(content, decryptedHistory, convTopic);
               const encReply = encryptMessage(sukhiReply.content);
 
               const sukhiMsg = addMessage({

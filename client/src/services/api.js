@@ -146,5 +146,8 @@ export const api = {
   unbanUser: (sessionId) =>
     adminRequest(`/admin/users/${sessionId}/unban`, { method: 'POST' }),
 
-  getHotlines: () => request('/hotlines')
+  getHotlines: () => request('/hotlines'),
+  getAiConfig: () => adminRequest('/admin/ai-config'),
+  saveAiConfig: (apiKey) => adminRequest('/admin/ai-config', { method: 'POST', body: JSON.stringify({ api_key: apiKey }) }),
+  testAi: (prompt, topic) => adminRequest('/admin/ai-test', { method: 'POST', body: JSON.stringify({ prompt, topic }) })
 };

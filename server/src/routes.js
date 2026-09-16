@@ -24,7 +24,7 @@ import {
   addAuditLog,
   saveDatabase
 } from './db.js';
-import { getSukhiResponse, SUKHI_SESSION_ID, SUKHI_ALIAS } from './sukhi.js';
+import { getSukhiResponse, setGroqApiKey, getAiStatus, SUKHI_SESSION_ID, SUKHI_ALIAS } from './sukhi.js';
 
 const router = express.Router();
 
@@ -370,7 +370,7 @@ router.post('/conversations/start-sukhi', async (req, res) => {
         is_crisis_keyword_detected: crisisCheck.isCrisis
       });
 
-      const sukhiGreeting = await getSukhiResponse(initial_prompt, []);
+      const sukhiGreeting = await getSukhiResponse(initial_prompt, [], conversation.topic);
       addMessage({
         conversation_id: conversationId,
         sender_session_id: SUKHI_SESSION_ID,
@@ -788,6 +788,28 @@ router.post('/admin/users/:sessionId/unban', requireAdmin, (req, res) => {
 router.get('/admin/audit-logs', requireAdmin, (req, res) => {
   const db = getDb();
   res.json({ success: true, audit_logs: db.audit_logs || [] });
+});
+
+router.get('/admin/ai-config', requireAdmin, (req, res) => {
+  res.json({ success: true, config: getAiStatus() });
+});
+
+router.post('/admin/ai-config', requireAdmin, (req, res) => {
+  const { api_key } = req.body;
+  setGroqApiKey(api_key);
+  res.json({ success: true, config: getAiStatus() });
+});
+
+router.post('/admin/ai-test', requireAdmin, async (req, res) => {
+  try {
+    const { prompt, topic } = req.body;
+    const testPrompt = prompt || 'i feel academic stress';
+    const testTopic = topic || 'Academic Stress';
+    const reply = await getSukhiResponse(testPrompt, [], testTopic);
+    res.json({ success: true, reply: reply.content, isCrisis: reply.isCrisis, config: getAiStatus() });
+  } catch (err) {
+    res.status(500).json({ error: 'AI test failed: ' + err.message });
+  }
 });
 
 router.get('/hotlines', (req, res) => {

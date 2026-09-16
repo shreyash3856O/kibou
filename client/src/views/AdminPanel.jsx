@@ -26,6 +26,13 @@ export default function AdminPanel() {
   const [replyInput, setReplyInput] = useState('');
   const [actionNotes, setActionNotes] = useState('');
   const [manualIpToBan, setManualIpToBan] = useState('');
+  const [aiConfig, setAiConfig] = useState({ provider: '', groqConfigured: false, model: '' });
+  const [groqKeyInput, setGroqKeyInput] = useState('');
+  const [aiSaveMsg, setAiSaveMsg] = useState('');
+  const [aiTestPrompt, setAiTestPrompt] = useState('i feel academic stress');
+  const [aiTestTopic, setAiTestTopic] = useState('Academic Stress');
+  const [aiTestResponse, setAiTestResponse] = useState('');
+  const [aiTesting, setAiTesting] = useState(false);
   const messagesEndRef = useRef(null);
 
   const loadData = async () => {
@@ -39,6 +46,9 @@ export default function AdminPanel() {
       setReports(repRes.reports || []);
       setUsersData(usrRes || { sessions: [], banned_ips: [] });
       setFacultyChats(chatRes.chats || []);
+      api.getAiConfig().then((res) => {
+        if (res.config) setAiConfig(res.config);
+      }).catch(() => {});
     } catch (err) {
       console.error('loadData error:', err);
     }
@@ -175,6 +185,34 @@ export default function AdminPanel() {
     }
   };
 
+  const handleSaveGroqKey = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await api.saveAiConfig(groqKeyInput.trim());
+      if (res.config) setAiConfig(res.config);
+      setAiSaveMsg('AI Key updated and saved successfully!');
+      setGroqKeyInput('');
+      setTimeout(() => setAiSaveMsg(''), 4000);
+    } catch (err) {
+      setAiSaveMsg('Failed to save key: ' + err.message);
+    }
+  };
+
+  const handleRunAiTest = async (e) => {
+    e.preventDefault();
+    setAiTesting(true);
+    setAiTestResponse('');
+    try {
+      const res = await api.testAi(aiTestPrompt, aiTestTopic);
+      setAiTestResponse(res.reply || 'No response received');
+      if (res.config) setAiConfig(res.config);
+    } catch (err) {
+      setAiTestResponse('Error: ' + err.message);
+    } finally {
+      setAiTesting(false);
+    }
+  };
+
   const handleUnbanIp = async (ip) => {
     try {
       await api.unbanIp(ip);
@@ -219,7 +257,7 @@ export default function AdminPanel() {
                 <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '600', marginBottom: '4px' }}>UID:</label>
                 <input
                   type="text"
-                  placeholder="shreyyay"
+                  placeholder="Enter UID"
                   value={uid}
                   onChange={(e) => setUid(e.target.value)}
                   className="input-text"
@@ -230,7 +268,7 @@ export default function AdminPanel() {
                 <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '600', marginBottom: '4px' }}>Password:</label>
                 <input
                   type="password"
-                  placeholder="Enter password (e.g. 100)"
+                  placeholder="Enter password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="input-text"
@@ -242,10 +280,10 @@ export default function AdminPanel() {
           ) : (
             <form onSubmit={handle2faSubmit}>
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '600', marginBottom: '4px' }}>2FA Code (or 100):</label>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '600', marginBottom: '4px' }}>2FA Code:</label>
                 <input
                   type="text"
-                  placeholder="100"
+                  placeholder="Enter 2FA Code"
                   value={twoFaCode}
                   onChange={(e) => setTwoFaCode(e.target.value)}
                   className="input-text"
@@ -344,7 +382,8 @@ export default function AdminPanel() {
           { id: 'messages', label: `Faculty Messages (${facultyChats.length})` },
           { id: 'reports', label: `Reports (${reports.length})` },
           { id: 'ip_bans', label: `Banned IPs (${usersData.banned_ips?.length || 0})` },
-          { id: 'users', label: `Sessions (${usersData.sessions?.length || 0})` }
+          { id: 'users', label: `Sessions (${usersData.sessions?.length || 0})` },
+          { id: 'ai', label: 'AI Companion (Sukhi)' }
         ].map((tab) => (
           <button
             key={tab.id}
@@ -488,6 +527,103 @@ export default function AdminPanel() {
               </div>
             ))
           )}
+        </div>
+      )}
+
+      {/* TAB: AI COMPANION (SUKHI) */}
+      {activeTab === 'ai' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className="flat-card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px', marginBottom: '12px' }}>
+              <div>
+                <h3 style={{ fontSize: '1rem', fontWeight: '700', marginBottom: '4px' }}>Sukhi AI Engine Status</h3>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  Active Engine: <strong style={{ color: 'var(--text-primary)' }}>{aiConfig.provider || 'Context-Trained Engine'}</strong>
+                </div>
+              </div>
+              <span className={`badge-pill ${aiConfig.groqConfigured ? 'badge-green' : 'badge-amber'}`} style={{ fontSize: '0.75rem' }}>
+                {aiConfig.groqConfigured ? 'Groq Llama 3.3 Active' : 'Kibou Context Engine'}
+              </span>
+            </div>
+
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: '1.5', marginBottom: '14px' }}>
+              Sukhi uses our context-trained mental health dialogue engine by default. For the fastest responses (~300ms) with Llama 3.3 70B, you can provide a free Groq API key.
+            </p>
+
+            <form onSubmit={handleSaveGroqKey} style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <input
+                type="password"
+                placeholder={aiConfig.groqKeyMasked ? `Current: ${aiConfig.groqKeyMasked}` : 'Paste Groq API Key (gsk_...)'}
+                value={groqKeyInput}
+                onChange={(e) => setGroqKeyInput(e.target.value)}
+                className="input-text"
+                style={{ flex: 1, minWidth: '240px' }}
+              />
+              <button type="submit" className="btn btn-primary" style={{ padding: '8px 16px' }}>
+                Save & Activate
+              </button>
+            </form>
+            {aiSaveMsg && (
+              <div style={{ marginTop: '8px', fontSize: '0.8rem', color: aiSaveMsg.startsWith('Failed') ? '#f87171' : '#4ade80' }}>
+                {aiSaveMsg}
+              </div>
+            )}
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '8px' }}>
+              Free keys can be generated at <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'underline' }}>console.groq.com</a>.
+            </div>
+          </div>
+
+          <div className="flat-card">
+            <h3 style={{ fontSize: '0.95rem', fontWeight: '700', marginBottom: '8px' }}>Live AI Test Console</h3>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '12px' }}>
+              Test how Sukhi handles context and emotional nuance in real-time.
+            </p>
+
+            <form onSubmit={handleRunAiTest} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: '160px' }}>
+                  <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Category Context:</label>
+                  <select
+                    value={aiTestTopic}
+                    onChange={(e) => setAiTestTopic(e.target.value)}
+                    className="input-text"
+                    style={{ padding: '6px 10px', fontSize: '0.8rem' }}
+                  >
+                    <option value="Academic Stress">Academic Stress</option>
+                    <option value="Anxiety & Panic">Anxiety & Panic</option>
+                    <option value="Relationships & Loneliness">Relationships & Loneliness</option>
+                    <option value="Exhaustion & Sleep">Exhaustion & Sleep</option>
+                    <option value="General Venting">General Venting</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>User Prompt:</label>
+                <input
+                  type="text"
+                  placeholder="e.g. i feel academic stress"
+                  value={aiTestPrompt}
+                  onChange={(e) => setAiTestPrompt(e.target.value)}
+                  className="input-text"
+                  required
+                />
+              </div>
+
+              <button type="submit" disabled={aiTesting} className="btn btn-primary" style={{ alignSelf: 'flex-start', padding: '6px 16px' }}>
+                {aiTesting ? 'Generating...' : 'Test Sukhi Reply'}
+              </button>
+            </form>
+
+            {aiTestResponse && (
+              <div style={{ marginTop: '14px', padding: '12px', backgroundColor: 'var(--bg-app)', border: '1px solid var(--border-color)', borderRadius: '6px' }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '6px' }}>Sukhi Response:</div>
+                <div style={{ fontSize: '0.85rem', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>
+                  {aiTestResponse}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

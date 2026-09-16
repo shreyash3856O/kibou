@@ -9,6 +9,7 @@ import dotenv from 'dotenv';
 import { fileURLToPath as _fileURLToPath } from 'node:url';
 const _envDir = path.dirname(_fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(_envDir, '../.env') });
+dotenv.config({ path: path.join(_envDir, '../../.env') });
 import apiRouter from './routes.js';
 import { setupSocketIO } from './socket.js';
 import { initializeDatabase } from './db.js';
