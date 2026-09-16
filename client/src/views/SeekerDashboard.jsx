@@ -183,7 +183,7 @@ export default function SeekerDashboard() {
 
           <div style={{ padding: '14px', backgroundColor: 'rgba(99, 102, 241, 0.08)', borderRadius: '8px', border: '1px solid var(--border-color)', marginBottom: '20px', textAlign: 'left' }}>
             <div style={{ fontWeight: '700', fontSize: '0.9rem', marginBottom: '4px', color: 'var(--text-primary)' }}>
-              🧘 Don't want to wait?
+              Don't want to wait?
             </div>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '10px', lineHeight: '1.4' }}>
               <strong>Sukhi</strong>, your mindful AI peer friend, is online 24/7. Always here for gentle perspective, mindful venting, and compassionate listening.
@@ -196,7 +196,7 @@ export default function SeekerDashboard() {
               className="btn btn-accent btn-block"
               style={{ padding: '8px 12px', fontSize: '0.85rem' }}
             >
-              ✨ Talk to Sukhi (Instant AI Companion)
+              Talk to Sukhi (Instant AI Companion)
             </button>
           </div>
 
@@ -222,7 +222,7 @@ export default function SeekerDashboard() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '700', fontSize: '0.95rem' }}>
-                  <span>🧘 Meet Sukhi (AI Companion)</span>
+                  <span>Meet Sukhi (AI Companion)</span>
                   <span style={{ fontSize: '0.68rem', backgroundColor: 'var(--btn-accent-bg)', color: '#fff', padding: '1px 6px', borderRadius: '10px' }}>24/7 Instant</span>
                 </div>
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '3px' }}>
@@ -230,7 +230,7 @@ export default function SeekerDashboard() {
                 </div>
               </div>
               <button className="btn btn-accent" style={{ padding: '6px 12px', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
-                Chat Now ➔
+                Chat Now
               </button>
             </div>
           </div>
@@ -254,7 +254,7 @@ export default function SeekerDashboard() {
                   className={`topic-item ${isSelected ? 'selected' : ''}`}
                 >
                   <span>{topic}</span>
-                  {isSelected && <span>✓</span>}
+                  {isSelected && <span>+</span>}
                 </div>
               );
             })}
@@ -290,7 +290,7 @@ export default function SeekerDashboard() {
               style={{ padding: '12px 16px', fontSize: '0.95rem' }}
               title="Chat instantly with Sukhi AI"
             >
-              ✨ Talk with Sukhi
+              Talk with Sukhi
             </button>
           </div>
 

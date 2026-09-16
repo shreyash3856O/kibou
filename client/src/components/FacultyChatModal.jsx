@@ -70,7 +70,7 @@ export default function FacultyChatModal() {
             <div style={{ fontWeight: '700', fontSize: '0.95rem' }}>Campus Counselor</div>
             <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Confidential Direct Thread</div>
           </div>
-          <button onClick={() => setShowFacultyChatModal(false)} className="icon-btn">✕</button>
+          <button onClick={() => setShowFacultyChatModal(false)} className="icon-btn">x</button>
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', padding: '12px 0', display: 'flex', flexDirection: 'column', gap: '8px' }}>

@@ -23,7 +23,7 @@ export default function DrawerMenu() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
           <span style={{ fontWeight: '700', fontSize: '1.05rem' }}>Menu</span>
           <button onClick={() => setShowDrawer(false)} className="icon-btn">
-            ✕
+            x
           </button>
         </div>
 

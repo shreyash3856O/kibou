@@ -210,8 +210,8 @@ export default function ChatRoom() {
           </div>
           <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
             {(activeConversation?.helper_session_id === 'sukhi_ai_helper' || activeConversation?.is_ai)
-              ? '🧘 Sukhi (Mindful AI Peer)'
-              : '🔒 Encrypted peer session'}
+              ? 'Sukhi (Mindful AI Peer)'
+              : 'Encrypted peer session'}
           </div>
         </div>
 
@@ -264,7 +264,7 @@ export default function ChatRoom() {
 
         {isPeerTyping && (
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span>{(activeConversation?.helper_session_id === 'sukhi_ai_helper' || activeConversation?.is_ai) ? '🧘 Sukhi is reflecting...' : 'Peer is typing...'}</span>
+            <span>{(activeConversation?.helper_session_id === 'sukhi_ai_helper' || activeConversation?.is_ai) ? 'Sukhi is reflecting...' : 'Peer is typing...'}</span>
           </div>
         )}
         <div ref={messagesEndRef} />

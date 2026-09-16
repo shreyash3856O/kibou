@@ -3,7 +3,7 @@ import { detectCrisis } from './security.js';
 export const SUKHI_SESSION_ID = 'sukhi_ai_helper';
 export const SUKHI_ALIAS = 'Sukhi (AI Companion)';
 
-export const SUKHI_SYSTEM_PROMPT = `You are "Sukhi" (सुखी), a warm, emotionally intelligent, and culturally attuned peer companion on Kibou — a student mental wellness platform in India.
+export const SUKHI_SYSTEM_PROMPT = `You are "Sukhi", a warm, emotionally intelligent, and culturally attuned peer companion on Kibou — a student mental wellness platform in India.
 
 ## YOUR CORE TASK
 You are having an ONGOING CONVERSATION. You will receive the FULL history of the chat. You MUST:
@@ -52,12 +52,12 @@ export function containsCrisisSignal(message) {
   return CRISIS_KEYWORDS.some((kw) => lower.includes(kw));
 }
 
-export const CRISIS_FALLBACK_RESPONSE = `I hear you, and I am so glad you reached out to talk to me. What you are going through is real, but you do not have to carry this heavy weight alone dost. 💙
+export const CRISIS_FALLBACK_RESPONSE = `I hear you, and I am so glad you reached out to talk to me. What you are going through is real, but you do not have to carry this heavy weight alone dost.
 
 Please reach out to people who can support you right now:
-📞 **Tele-MANAS (Govt of India)**: Call **14416** (Toll-free, 24/7)
-📞 **KIRAN Helpline**: Call **1800-599-0019** (Toll-free, 24/7)
-📞 **Shreyash Chaturvedi (Friendly Helper)**: **7304167033**
+Tele-MANAS (Govt of India): Call 14416 (Toll-free, 24/7)
+KIRAN Helpline: Call 1800-599-0019 (Toll-free, 24/7)
+Shreyash Chaturvedi (Friendly Helper): 7304167033
 
 Take one slow, deep breath with me. You matter, and help is here for you 24/7.`;
 
@@ -127,13 +127,13 @@ function generateContextualLocalResponse(userMessage, history = []) {
   // If user said "yes", "ok", "hmm" etc., respond in context of what we were discussing
   if (isShortAcknowledgment(text) || text.length < 6) {
     if (lastSukhiMsg.toLowerCase().includes('breathe') || lastSukhiMsg.toLowerCase().includes('breath') || lastSukhiMsg.toLowerCase().includes('4-7-8')) {
-      return `Good — even that one small breath counts dost. 💙 How are you feeling now compared to a few minutes ago? Even slightly better is progress.`;
+      return `Good — even that one small breath counts dost. How are you feeling now compared to a few minutes ago? Even slightly better is progress.`;
     }
     if (lastSukhiMsg.toLowerCase().includes('exam') || lastSukhiMsg.toLowerCase().includes('study') || lastSukhiMsg.toLowerCase().includes('25 minutes')) {
-      return `That's a solid start yaar! Just one small step at a time. Which subject or topic were you planning to tackle first?`;
+      return `That is a solid start yaar! Just one small step at a time. Which subject or topic were you planning to tackle first?`;
     }
     if (lastSukhiMsg.toLowerCase().includes('python') || lastSukhiMsg.toLowerCase().includes('code') || lastSukhiMsg.toLowerCase().includes('programming')) {
-      return `Awesome! Are you working on this for college coursework, a personal project, or something else? Tell me more so I can help you better dost. 💻`;
+      return `Awesome! Are you working on this for college coursework, a personal project, or something else? Tell me more so I can help you better dost.`;
     }
     if (lastSukhiMsg.toLowerCase().includes('sleep') || lastSukhiMsg.toLowerCase().includes('screen') || lastSukhiMsg.toLowerCase().includes('racing')) {
       return `That's good to hear. Rest is so important yaar. What usually helps you wind down when your mind is busy at night?`;
@@ -156,17 +156,17 @@ function generateContextualLocalResponse(userMessage, history = []) {
     }
     // Very generic warm follow-up
     return msgCount > 2
-      ? `I'm right here with you dost. 🙏 Take your time — what's the one thing on your mind right now that's taking up the most space?`
-      : `Namaste dost! I'm Sukhi, your 24/7 buddy on Kibou. What's on your mind today — studies, life, or just need to vent?`;
+      ? `I am right here with you dost. Take your time — what is the one thing on your mind right now that is taking up the most space?`
+      : `Namaste dost! I am Sukhi, your 24/7 buddy on Kibou. What is on your mind today — studies, life, or just need to vent?`;
   }
 
   // --- CONFUSION / SLANG REACTIONS ---
   if (/^(nigga\s+)?(what|wat|wut|huh|bruh|bro|wth|wtf|um+|umm+|uh+|lol|lmao|k)$/i.test(lower) ||
       lower.includes('nigga what') || lower.includes('what are you saying') || lower.includes('makes no sense')) {
     const reactions = [
-      `Haha, my bad dost! Did I get a bit too deep there? 😄 Tell me what's actually on your mind in simple words — I'm listening!`,
-      `Arre haha, let me reset! I promise no heavy lectures. What's up with you today yaar?`,
-      `Ha fair enough! Let's keep it real and simple. What were you asking about, or what's bothering you?`
+      `Haha, my bad dost! Did I get a bit too deep there? Tell me what is actually on your mind in simple words — I am listening!`,
+      `Arre haha, let me reset! I promise no heavy lectures. What is up with you today yaar?`,
+      `Ha fair enough! Let us keep it real and simple. What were you asking about, or what is bothering you?`
     ];
     return reactions[Math.floor(Math.random() * reactions.length)];
   }
@@ -174,14 +174,14 @@ function generateContextualLocalResponse(userMessage, history = []) {
   // --- GREETINGS (only if first or second message) ---
   if (/^(hi|hello|hey|namaste|hola|sup|kaisa hai|yo|good morning|good evening|good afternoon)/i.test(lower) && msgCount <= 4) {
     if (topic !== 'general') {
-      return `Namaste dost! 🙏 I see we were talking about ${topic === 'academics' ? 'your studies' : topic}. I'm still right here — want to pick up where we left off?`;
+      return `Namaste dost! I see we were talking about ${topic === 'academics' ? 'your studies' : topic}. I am still right here — want to pick up where we left off?`;
     }
-    return `Namaste dost! 🙏 I'm Sukhi, your mindful buddy on Kibou. Whether you want to talk about college pressure, life, or just vent — I'm all ears. How are you feeling today?`;
+    return `Namaste dost! I am Sukhi, your mindful buddy on Kibou. Whether you want to talk about college pressure, life, or just vent — I am all ears. How are you feeling today?`;
   }
 
   // --- GRATITUDE ---
   if (lower.includes('thank') || lower.includes('dhanyawad') || lower.includes('thx') || lower.includes('shukriya')) {
-    return `You're always welcome dost! 🌸 Really glad we're talking. Drink some water, take a gentle stretch. Is there anything else on your mind?`;
+    return `You are always welcome dost! Really glad we are talking. Drink some water, take a gentle stretch. Is there anything else on your mind?`;
   }
 
   // --- TECHNICAL / CODING ---
@@ -189,17 +189,17 @@ function generateContextualLocalResponse(userMessage, history = []) {
     if (lower.includes('python')) {
       const isFollowUp = topic === 'coding' && userMsgs.length > 1;
       if (isFollowUp) {
-        return `Picking up our Python chat! 🐍 So where exactly are you right now — still with the basics, or have you moved on to functions, loops, or something like data structures?`;
+        return `Picking up our Python chat! So where exactly are you right now — still with the basics, or have you moved on to functions, loops, or something like data structures?`;
       }
-      return `Aha, Python! Great choice dost 🐍✨\n\nPython is super friendly to start with. Just like making chai — start simple:\n1. **Print stuff**: \`print("Namaste!")\`\n2. **Variables**: \`mood = "stressed"\`\n3. **Loops & logic**: \`if mood == "stressed": take_break()\`\n\nAre you learning this for college, a project, or just for fun?`;
+      return `Aha, Python! Great choice dost.\n\nPython is super friendly to start with. Just like making chai — start simple:\n1. Print stuff: print("Namaste!")\n2. Variables: mood = "stressed"\n3. Loops and logic: if mood == "stressed": take_break()\n\nAre you learning this for college, a project, or just for fun?`;
     }
-    return `Coding can be exciting and frustrating at the same time! What specific language or concept are you working on? Tell me what you're building and we can break it down step by step. 💻`;
+    return `Coding can be exciting and frustrating at the same time! What specific language or concept are you working on? Tell me what you are building and we can break it down step by step.`;
   }
 
   // --- ACADEMICS ---
   if (lower.includes('exam') || lower.includes('marks') || lower.includes('study') || lower.includes('studying') || lower.includes('fail') || lower.includes('college') || lower.includes('assignment') || lower.includes('syllabus')) {
     if (topic === 'academics' && userMsgs.length > 1) {
-      return `Okay, let's take this one step at a time yaar. You mentioned exams/studies — which specific subject or deadline is pressing you most right now? Let's focus on just that one thing first.`;
+      return `Okay, let us take this one step at a time yaar. You mentioned exams/studies — which specific subject or deadline is pressing you most right now? Let us focus on just that one thing first.`;
     }
     return `Academic stress can feel like a storm that never breaks. But remember — an exam score is one moment in time, not your whole story.\n\nWhen overwhelmed, try this: pick just ONE topic for 25 minutes. Set a timer. Just that, nothing else.\n\nWhich subject or exam is stressing you the most right now?`;
   }
@@ -207,35 +207,35 @@ function generateContextualLocalResponse(userMessage, history = []) {
   // --- ANXIETY / PANIC ---
   if (lower.includes('anxious') || lower.includes('anxiety') || lower.includes('panic') || lower.includes('overthinking') || lower.includes('scared') || lower.includes('stress') || lower.includes('stressed') || lower.includes('nervous')) {
     if (topic === 'anxiety' && userMsgs.length > 1) {
-      return `Still feeling that tension dost? Let's try one more grounding step together — name 3 things you can see right now in your room. Just describe them simply. It helps pull the mind back to this moment. 🌿`;
+      return `Still feeling that tension dost? Let us try one more grounding step together — name 3 things you can see right now in your room. Just describe them simply. It helps pull the mind back to this moment.`;
     }
-    return `I hear you dost — let's do a quick 4-7-8 grounding exercise together:\n\n🌬️ **Breathe in slowly** for 4 seconds...\n⏸️ **Hold gently** for 7 seconds...\n💨 **Exhale softly** for 8 seconds.\n\nFeel your feet on the floor. You're safe. What's causing the biggest tension right now?`;
+    return `I hear you dost — let us do a quick 4-7-8 grounding exercise together:\n\nBreathe in slowly for 4 seconds...\nHold gently for 7 seconds...\nExhale softly for 8 seconds.\n\nFeel your feet on the floor. You are safe. What is causing the biggest tension right now?`;
   }
 
   // --- LONELINESS / RELATIONSHIP ---
   if (lower.includes('lonely') || lower.includes('alone') || lower.includes('breakup') || lower.includes('relationship') || lower.includes('ignored') || lower.includes('nobody cares')) {
     if (topic === 'loneliness' && userMsgs.length > 1) {
-      return `That feeling of being unseen can really wear you down dost. Is this something that's been going on with a specific person, or more of a general emptiness that's hard to pin down?`;
+      return `That feeling of being unseen can really wear you down dost. Is this something that has been going on with a specific person, or more of a general emptiness that is hard to pin down?`;
     }
-    return `Feeling alone or dealing with relationship hurt cuts very deep. But right now — you're not alone. I'm right here listening with an open heart.\n\nIt's okay to feel sad or disappointed. What happened that's making you feel this way dost?`;
+    return `Feeling alone or dealing with relationship hurt cuts very deep. But right now — you are not alone. I am right here listening with an open heart.\n\nIt is okay to feel sad or disappointed. What happened that is making you feel this way dost?`;
   }
 
   // --- SLEEP / FATIGUE ---
   if (lower.includes('sleep') || lower.includes('tired') || lower.includes('insomnia') || lower.includes('exhausted') || lower.includes("can't sleep") || lower.includes('cant sleep')) {
-    return `When the body is tired but the mind won't stop, it's exhausting. Try this: loosen your jaw, drop your shoulders, take slow belly breaths in the dark, and put away screens if you can.\n\nWhat thoughts are keeping you awake tonight dost?`;
+    return `When the body is tired but the mind will not stop, it is exhausting. Try this: loosen your jaw, drop your shoulders, take slow belly breaths in the dark, and put away screens if you can.\n\nWhat thoughts are keeping you awake tonight dost?`;
   }
 
   // --- SADNESS / DEPRESSION ---
   if (lower.includes('sad') || lower.includes('cry') || lower.includes('crying') || lower.includes('depressed') || lower.includes('hopeless') || lower.includes('numb') || lower.includes('empty')) {
     if (topic === 'sadness' && userMsgs.length > 1) {
-      return `I'm with you dost. That heaviness is real. You don't have to rush to feel better or explain yourself. Is there anything specific that happened, or does this feel like a wave that came out of nowhere?`;
+      return `I am with you dost. That heaviness is real. You do not have to rush to feel better or explain yourself. Is there anything specific that happened, or does this feel like a wave that came out of nowhere?`;
     }
-    return `I hear you dost, and I'm really glad you're here talking rather than carrying this alone. 💙\n\nFeeling sad or numb is your mind's way of saying something needs attention. You don't have to be "fine" right now.\n\nWhen did this start feeling this heavy for you?`;
+    return `I hear you dost, and I am really glad you are here talking rather than carrying this alone.\n\nFeeling sad or numb is your mind's way of saying something needs attention. You do not have to be fine right now.\n\nWhen did this start feeling this heavy for you?`;
   }
 
   // --- ANGER / FRUSTRATION ---
   if (lower.includes('angry') || lower.includes('mad') || lower.includes('rage') || lower.includes('frustrated') || lower.includes('irritated') || lower.includes('pissed')) {
-    return `That frustration is completely valid dost. Sometimes we carry so much and just explode. Let it out here — what happened that set this off? I'm listening without any judgment.`;
+    return `That frustration is completely valid dost. Sometimes we carry so much and just explode. Let it out here — what happened that set this off? I am listening without any judgment.`;
   }
 
   // --- GENERAL ENGAGING CONTEXTUAL REPLY ---

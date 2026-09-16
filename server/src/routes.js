@@ -380,7 +380,7 @@ router.post('/conversations/start-sukhi', async (req, res) => {
         is_crisis_keyword_detected: sukhiGreeting.isCrisis
       });
     } else {
-      const opening = "Namaste dost! I'm Sukhi, your mindful companion on Kibou. Whether you're feeling stressed, overwhelmed, or just need to vent over a virtual cup of chai, I'm right here with you. What's on your mind today?";
+      const opening = "Namaste dost! I am Sukhi, your mindful companion on Kibou. Whether you are feeling stressed, overwhelmed, or just need to vent, I am right here with you. What is on your mind today?";
       addMessage({
         conversation_id: conversationId,
         sender_session_id: SUKHI_SESSION_ID,

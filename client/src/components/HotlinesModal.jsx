@@ -10,7 +10,7 @@ export default function HotlinesModal() {
       <div className="modal-box" onClick={(e) => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
           <h3 style={{ fontSize: '1.1rem' }}>24/7 Crisis Helplines</h3>
-          <button onClick={() => setShowHotlinesModal(false)} className="icon-btn">✕</button>
+          <button onClick={() => setShowHotlinesModal(false)} className="icon-btn">x</button>
         </div>
 
         <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '16px' }}>

@@ -36,7 +36,7 @@ export default function BreathingModal() {
       <div className="modal-box" style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <h3 style={{ fontSize: '1.1rem' }}>4-7-8 Breathing</h3>
-          <button onClick={() => setShowBreathingModal(false)} className="icon-btn">✕</button>
+          <button onClick={() => setShowBreathingModal(false)} className="icon-btn">x</button>
         </div>
 
         <div style={{ padding: '30px 0' }}>
