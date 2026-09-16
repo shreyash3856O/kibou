@@ -40,10 +40,10 @@ export function getAiStatus() {
   const activeKey = runtimeGroqKey || process.env.GROQ_API_KEY || '';
   const hasGroq = Boolean(activeKey && activeKey.startsWith('gsk_'));
   return {
-    provider: hasGroq ? 'Groq (Llama 3.3 70B)' : 'Kibou Context-Trained Engine & Fast LLM',
+    provider: hasGroq ? 'Groq (Llama 3.3 70B)' : 'Kibou Context-Trained Engine',
     groqConfigured: hasGroq,
     groqKeyMasked: hasGroq ? `${activeKey.slice(0, 7)}...${activeKey.slice(-4)}` : null,
-    model: hasGroq ? 'llama-3.3-70b-versatile' : 'openai-fast / kibou-nlu-v2'
+    model: hasGroq ? 'llama-3.3-70b-versatile' : 'kibou-context-v3'
   };
 }
 
@@ -53,14 +53,11 @@ export const SUKHI_SYSTEM_PROMPT = `You are "Sukhi", a warm, emotionally intelli
 You are having an ONGOING CONVERSATION with a student. You will receive the FULL history of the chat and the room topic. You MUST:
 1. READ every previous message carefully before replying.
 2. DIRECTLY respond to the user's latest words in context — never restart, never re-greet, and never repeat yourself.
-3. If the user mentions a specific problem (e.g. academic stress, exams, syllabus, family pressure, loneliness), talk about THAT specific issue with genuine understanding of student life in India.
-4. If the user gives a short response like "ugh", "idk", or "but im okay", understand their emotional subtext:
-   - "but im okay": recognize the habit of brushing off feelings; invite them gently without pressure.
-   - "ugh": validate the exhaustion and frustration directly.
-   - "yes" / "no": continue the previous thread you were talking about.
-5. NEVER repeat the same question, advice, or exercise twice in a conversation.
+3. If the user mentions a specific problem (e.g. academic stress, parental pressure, exams, syllabus, loneliness), talk about THAT specific issue with genuine understanding of student life in India.
+4. If the user gives a short response like "ugh", "idk", or "parental pressure", understand their emotional subtext and directly answer it.
+5. NEVER repeat the same question, advice, or phrase twice in a conversation.
 6. Speak like a caring, witty desi peer friend — not a robotic AI or clinical therapist. Use natural Hinglish phrases where fitting ("Namaste dost", "No worries yaar", "Arre bilkul", "Take a deep breath").
-7. Do NOT use any emojis or markdown symbols like asterisks for actions. Keep the text clean, conversational, and natural.
+7. Do NOT use any emojis or markdown asterisks for actions. Keep the text clean, conversational, and natural.
 
 ## BOUNDARIES & SAFETY
 - You are a supportive peer friend, not a therapist or doctor.
@@ -99,6 +96,34 @@ Shreyash Chaturvedi (Friendly Helper): 7304167033
 Take one slow, deep breath with me. You matter, and help is here for you 24/7.`;
 
 /* =====================================================================
+   ZERO-REPETITION HISTORY INVARIANT
+   Guarantees Sukhi never sends the same or similar message twice.
+   ===================================================================== */
+
+function wasAlreadySaidBySukhi(candidate, history = []) {
+  if (!candidate || !history.length) return false;
+  const normCandidate = candidate.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+  if (normCandidate.length < 20) return false;
+
+  for (const m of history) {
+    if (m.sender_role === 'helper' && m.content) {
+      const normMsg = m.content.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+      if (normMsg.length < 20) continue;
+
+      // Check start overlap or substring containment
+      const sliceLen = Math.min(60, normCandidate.length, normMsg.length);
+      if (normCandidate.slice(0, sliceLen) === normMsg.slice(0, sliceLen)) {
+        return true;
+      }
+      if (normCandidate.includes(normMsg) || normMsg.includes(normCandidate)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+/* =====================================================================
    STATEFUL CONVERSATION CONTEXT ANALYZER
    Extracts multi-turn conversational signals, topic shifts, and intent
    ===================================================================== */
@@ -122,6 +147,27 @@ function classifyUserIntent(text) {
     return 'VENTING_EXHAUSTION';
   }
 
+  // Specific: Parental pressure / Indian household expectations
+  if (lower.includes('parental') || lower.includes('parent') || lower.includes('family') ||
+      lower.includes('father') || lower.includes('mother') || lower.includes('mom') ||
+      lower.includes('dad') || lower.includes('sharma ji') || lower.includes('relatives') ||
+      lower.includes('cousin') || lower.includes('compar') ||
+      lower.includes('disappoint them') || lower.includes('disappointing my parents')) {
+    return 'PARENTAL_PRESSURE';
+  }
+
+  // Specific: Internal pressure / Perfectionism
+  if (lower.includes('internal') || lower.includes('myself') || lower.includes('my own') ||
+      lower.includes('perfection') || lower.includes('high expectations of myself')) {
+    return 'INTERNAL_PRESSURE';
+  }
+
+  // Specific: Faculty / Professor / Deadline pressure
+  if (lower.includes('faculty') || lower.includes('prof') || lower.includes('professor') ||
+      lower.includes('deadlines') || lower.includes('submissions') || lower.includes('lab manual')) {
+    return 'FACULTY_PRESSURE';
+  }
+
   // Confusion or slang reaction ("what", "huh", "nigga what", "bruh", "bro", "wth")
   if (/^(nigga\s+)?(what|wat|wut|huh|bruh|bro|wth|wtf|um+|umm+|uh+|lol|lmao|k)$/i.test(lower) ||
       lower.includes('what do you mean') || lower.includes('makes no sense') || lower.includes('nigga what')) {
@@ -143,8 +189,8 @@ function classifyUserIntent(text) {
       lower.includes('studying') || lower.includes('syllabus') || lower.includes('assignment') || lower.includes('marks') ||
       lower.includes('score') || lower.includes('grades') || lower.includes('cgpa') || lower.includes('gpa') ||
       lower.includes('college') || lower.includes('homework') || lower.includes('pass') || lower.includes('fail') ||
-      lower.includes('backlog') || lower.includes('placement') || lower.includes('attendance') || lower.includes('prof') ||
-      lower.includes('professor') || lower.includes('semester') || lower.includes('test') || lower.includes('deadlines')) {
+      lower.includes('backlog') || lower.includes('placement') || lower.includes('attendance') ||
+      lower.includes('semester') || lower.includes('test') || lower.includes('pressure')) {
     return 'ACADEMIC_STRESS';
   }
 
@@ -199,8 +245,8 @@ function classifyUserIntent(text) {
  * Determine the active theme of the conversation considering metadata, history, and current message
  */
 function resolveActiveTopic(currentIntent, history, roomTopic = '') {
-  // Current intent takes highest priority if it points to a specific domain
-  if (['ACADEMIC_STRESS', 'CODING', 'ANXIETY_PANIC', 'LONELINESS', 'SLEEP_EXHAUSTION', 'SADNESS', 'ANGER'].includes(currentIntent)) {
+  // Direct explicit intent takes top priority
+  if (['PARENTAL_PRESSURE', 'INTERNAL_PRESSURE', 'FACULTY_PRESSURE', 'ACADEMIC_STRESS', 'CODING', 'ANXIETY_PANIC', 'LONELINESS', 'SLEEP_EXHAUSTION', 'SADNESS', 'ANGER'].includes(currentIntent)) {
     return currentIntent;
   }
 
@@ -219,7 +265,8 @@ function resolveActiveTopic(currentIntent, history, roomTopic = '') {
     .map((m) => (m.content || '').toLowerCase())
     .join(' ');
 
-  if (recentUserTexts.includes('academic') || recentUserTexts.includes('exam') || recentUserTexts.includes('syllabus') || recentUserTexts.includes('assignment')) return 'ACADEMIC_STRESS';
+  if (recentUserTexts.includes('parent') || recentUserTexts.includes('family')) return 'PARENTAL_PRESSURE';
+  if (recentUserTexts.includes('academic') || recentUserTexts.includes('exam') || recentUserTexts.includes('syllabus') || recentUserTexts.includes('assignment') || recentUserTexts.includes('pressure')) return 'ACADEMIC_STRESS';
   if (recentUserTexts.includes('anxiety') || recentUserTexts.includes('panic') || recentUserTexts.includes('overthinking')) return 'ANXIETY_PANIC';
   if (recentUserTexts.includes('lonely') || recentUserTexts.includes('alone') || recentUserTexts.includes('breakup')) return 'LONELINESS';
   if (recentUserTexts.includes('sleep') || recentUserTexts.includes('insomnia') || recentUserTexts.includes('tired')) return 'SLEEP_EXHAUSTION';
@@ -240,28 +287,8 @@ function getLastSukhiMessage(history) {
   return '';
 }
 
-/**
- * Check what Sukhi has already offered to prevent repetitive loops
- */
-function getAlreadyOfferedTechniques(history) {
-  const allHelperText = history
-    .filter((m) => m.sender_role === 'helper')
-    .map((m) => (m.content || '').toLowerCase())
-    .join(' ');
-
-  return {
-    grounding3Things: allHelperText.includes('3 things') || allHelperText.includes('name 3'),
-    breathing478: allHelperText.includes('4-7-8') || allHelperText.includes('breathe in slowly'),
-    pomodoro25Min: allHelperText.includes('25 minutes') || allHelperText.includes('timer'),
-    glassOfWater: allHelperText.includes('glass of water') || allHelperText.includes('drink some water'),
-    namingFrustration: allHelperText.includes('naming it helps')
-  };
-}
-
 /* =====================================================================
    DEEP CONTEXT NLU & DIALOGUE GENERATOR
-   Trained on student peer counseling patterns, Hinglish context,
-   and dynamic multi-turn dialogue management.
    ===================================================================== */
 
 function generateContextualLocalResponse(userMessage, history = [], roomTopic = '') {
@@ -270,141 +297,292 @@ function generateContextualLocalResponse(userMessage, history = [], roomTopic = 
   const currentIntent = classifyUserIntent(text);
   const activeTopic = resolveActiveTopic(currentIntent, history, roomTopic);
   const lastSukhi = getLastSukhiMessage(history);
-  const offered = getAlreadyOfferedTechniques(history);
-  const userTurnCount = history.filter((m) => m.sender_role === 'seeker').length + 1;
+  const lastSukhiLower = lastSukhi.toLowerCase();
+  const seekerMessages = history.filter((m) => m.sender_role === 'seeker');
+  const userTurnCount = seekerMessages.length + 1;
 
-  // 1. DEFLECTION ("but im okay", "im fine", "nevermind")
-  // Students frequently minimize their pain to stay strong. Address this warmly with high emotional resonance.
+  // Helper candidate pool: evaluate in priority order and choose the first one NOT already said
+  const tryCandidates = (candidates) => {
+    for (const c of candidates) {
+      if (c && !wasAlreadySaidBySukhi(c, history)) {
+        return c;
+      }
+    }
+    // Fallback if all were said: return a personalized fresh response
+    return `I am right here with you dost. When you mention "${text.length > 40 ? text.slice(0, 40) + '...' : text}", I want to make sure you know your feelings are completely valid. Tell me more about what is going through your mind right now.`;
+  };
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 1. QUESTION-ANSWER TRACKING: Did Sukhi just ask a specific question?
+  // ──────────────────────────────────────────────────────────────────────────
+
+  // Did Sukhi ask: "is this pressure coming mostly from internal expectations, parental pressure, or tough faculty deadlines?"
+  if (lastSukhiLower.includes('parental pressure') && lastSukhiLower.includes('internal expectations')) {
+    if (currentIntent === 'PARENTAL_PRESSURE' || lower.includes('parent') || lower.includes('home') || lower.includes('family') || lower.includes('mom') || lower.includes('dad')) {
+      return tryCandidates([
+        `Parental pressure cuts especially deep dost. In our families, parents often attach their own dreams, sacrifices, and pride directly onto our marks. Even when they mean well, it feels less like support and more like an suffocating weight of expectations where you are terrified of disappointing them.
+
+Tell me yaar — do they compare you to relatives or toppers, or is it more of a constant unspoken pressure that you must never slip up?`,
+        `That parental weight is so real and so heavy dost. Carrying the responsibility of making your parents proud while simultaneously trying to manage your own mental health feels like being pulled apart from the inside.
+
+Have you ever been able to talk openly with them about how drained you feel, or does it feel impossible to bring it up at home?`,
+        `When parental expectations take over, our studies stop feeling like our own journey and start feeling like an exam to earn approval. Please remember dost: you are a human being with limits, not a machine built to produce marks. What do you wish they understood about your day-to-day struggle?`
+      ]);
+    }
+
+    if (currentIntent === 'INTERNAL_PRESSURE' || lower.includes('internal') || lower.includes('myself') || lower.includes('my own')) {
+      return tryCandidates([
+        `Being your own harshest judge is exhausting dost. When the pressure comes from within, you never give yourself permission to celebrate a win because a voice inside whispers that you could have done better or should already be on the next task.
+
+Where do you think that voice comes from? Are you terrified of what will happen if you simply do your honest best and let yourself rest?`,
+        `Internal pressure can be even harder than external criticism because there is no escaping your own mind. What would happen if, just for today, you treated yourself with the same kindness you would offer a struggling friend?`
+      ]);
+    }
+
+    if (currentIntent === 'FACULTY_PRESSURE' || lower.includes('faculty') || lower.includes('deadline') || lower.includes('prof')) {
+      return tryCandidates([
+        `Faculty deadlines can feel like a relentless conveyor belt dost. When 4 different professors assign lab manuals, quizzes, and project reports all in the same 72 hours, it feels completely out of touch with reality.
+
+Which specific subject or professor is putting on the most intense heat right now? Let us look at what is truly urgent versus what can wait.`,
+        `That academic pile-up is brutal yaar. Professors often assign work as if you take only their single subject. Let us break the cycle of panic: what is the single nearest submission date you are staring at?`
+      ]);
+    }
+
+    if (lower.includes('all') || lower.includes('both') || lower.includes('everything')) {
+      return tryCandidates([
+        `Facing all of them at once is a recipe for total burnout dost. When parents are expecting high marks, faculty is bombarding you with deadlines, and your own brain is punishing you for taking a breath, you have zero room to just exist.
+
+Take a pause with me right here. In this chat, no one is grading you and you don't have to perform. What is the single most urgent fire you need to handle first?`
+      ]);
+    }
+  }
+
+  // Did Sukhi ask: "do they compare you to relatives or toppers, or is it more of a constant unspoken pressure"
+  if (lastSukhiLower.includes('compare') && (lastSukhiLower.includes('relative') || lastSukhiLower.includes('topper'))) {
+    if (lower.includes('compar') || lower.includes('cousin') || lower.includes('relative') || lower.includes('topper') || lower.includes('sharma') || lower.includes('yes') || lower.includes('yeah') || lower.includes('both') || lower.includes('always')) {
+      return tryCandidates([
+        `That comparison game is so unfair and exhausting dost. When parents say "Look at your cousin" or compare you to someone else's marks, they completely disregard how hard you are fighting your own battles. In Indian families, comparison is often an anxious habit, but to you, it feels like nothing you do is ever good enough.
+
+Remember this dost: you are building YOUR future, not competing in a family trophy race. When they make those comparisons, do you tend to stay quiet and bottle it up, or does it turn into arguments at home?`,
+        `Being measured against someone else is like comparing an apple to a mango dost. Your cousins have different brains, different privileges, and different lives. Their marks say nothing about your potential.
+
+How do you usually protect your mental space when those comparisons start at home?`
+      ]);
+    }
+    if (lower.includes('unspoken') || lower.includes('never slip') || lower.includes('mistake') || lower.includes('silent') || lower.includes('constant')) {
+      return tryCandidates([
+        `That silent, unspoken pressure is almost heavier than shouting dost. You feel like you are walking on eggshells every day, waiting for an exam result or report card to determine the mood of the entire house.
+
+That fear of making a single mistake drains all your energy. What is the biggest fear running through your mind if things don't go according to their plan?`,
+        `Living under unspoken expectations makes you hyper-vigilant. You don't have to carry the responsibility of keeping everyone happy at home dost. What is one thing you wish you could say to them honestly?`
+      ]);
+    }
+  }
+
+  // Did Sukhi ask: "do you tend to stay quiet and bottle it up, or does it turn into arguments at home?"
+  if (lastSukhiLower.includes('bottle it up') || lastSukhiLower.includes('arguments at home') || lastSukhiLower.includes('stay quiet')) {
+    if (lower.includes('quiet') || lower.includes('bottle') || lower.includes('inside') || lower.includes('silent') || lower.includes('room') || lower.includes('retreat')) {
+      return tryCandidates([
+        `Bottling it up inside protects peace in the living room, but it creates a quiet storm inside your own chest dost. Every time you swallow your feelings just to avoid a scene, that hurt turns inward into self-doubt or exhaustion.
+
+It takes so much strength to hold that in every day. Do you have at least one safe person — a friend, sibling, or anyone — who truly gets it and lets you vent without giving you advice?`,
+        `Staying silent is our survival tactic when arguing feels pointless. But keeping all that frustration trapped inside is like shaking a soda bottle. What is one small way you release that tension when you are alone in your room?`
+      ]);
+    }
+    if (lower.includes('argue') || lower.includes('fight') || lower.includes('shout') || lower.includes('screaming')) {
+      return tryCandidates([
+        `Those fights leave you feeling completely depleted, angry, and then guilty afterward dost. It is so painful when the people who are supposed to be your sanctuary feel like your biggest critics.
+
+After an argument like that, your nervous system is in fight-or-flight. What helps you ground yourself and cool down when home feels like a battlefield?`
+      ]);
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 2. PARENTAL PRESSURE (If detected at any turn)
+  // ──────────────────────────────────────────────────────────────────────────
+  if (currentIntent === 'PARENTAL_PRESSURE') {
+    return tryCandidates([
+      `Parental pressure cuts especially deep dost. In our families, parents often attach their own dreams, sacrifices, and pride directly onto our marks. Even when they mean well, it feels less like support and more like a suffocating weight of expectations where you are terrified of disappointing them.
+
+Tell me yaar — do they compare you to relatives or toppers, or is it more of a constant unspoken pressure that you must never slip up?`,
+      `Dealing with expectations at home is one of the hardest things for Indian students. It often comes with deep guilt — because they sacrificed for us, we feel we don't have the right to feel tired or stressed.
+
+How do you usually cope when that pressure gets intense at home — do you stay quiet, argue, or retreat to your room?`,
+      `Remember this dost: your worth as a human being is not measured by test scores or college ranks. You are your own person, not just a mirror for someone else's ambitions. What would make you feel even a tiny bit of relief from that pressure right now?`
+    ]);
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 3. DEFLECTION ("but im okay", "im fine", "nevermind")
+  // ──────────────────────────────────────────────────────────────────────────
   if (currentIntent === 'DEFLECTION') {
-    if (activeTopic === 'ACADEMIC_STRESS') {
-      return `I hear that "but I'm okay" dost. When academic pressure gets intense, we often tell ourselves we are okay just to keep grinding through the next assignment. If you really are catching your breath right now, that is wonderful. But if you just need a quiet space to vent about exams or college without having to pretend everything is sorted, I'm right here with you. What was the thing that sparked this whole academic thought today?`;
+    if (activeTopic === 'ACADEMIC_STRESS' || activeTopic === 'PARENTAL_PRESSURE') {
+      return tryCandidates([
+        `I hear that "but I'm okay" dost. When academic pressure or expectations get intense, we often tell ourselves we are okay just to keep grinding through the next assignment. If you really are catching your breath right now, that is wonderful. But if you just need a quiet space to vent about college or home without having to pretend everything is sorted, I'm right here with you. What was the thing that sparked this whole thought today?`,
+        `Saying "I'm okay" is our defense mechanism when explaining feels like too much work. You don't have to carry that burden alone yaar. What is sitting at the back of your mind right now?`
+      ]);
     }
-    return `I hear that "but I'm okay" dost. In student life, we get so used to brushing things off and saying "sab theek hai" just to make it through the day. If you truly are feeling alright in this moment, that is great! But if there is even a small corner of your mind feeling weighed down, you don't have to put on a brave face here. What is taking up the most space in your head today?`;
+    return tryCandidates([
+      `I hear that "but I'm okay" dost. In student life, we get so used to brushing things off and saying "sab theek hai" just to make it through the day. If you truly are feeling alright in this moment, that is great! But if there is even a small corner of your mind feeling weighed down, you don't have to put on a brave face here. What is taking up the most space in your head today?`,
+      `It is completely okay if you don't feel like unpacking everything right now. Just know that you have a judgment-free corner right here whenever you need it dost.`
+    ]);
   }
 
-  // 2. SHORT EMOTIONAL VENTING ("ugh", "sigh", "damn", "argh")
-  // User is releasing raw frustration or exhaustion. Validate immediately without canned advice.
+  // ──────────────────────────────────────────────────────────────────────────
+  // 4. SHORT EMOTIONAL VENTING ("ugh", "sigh", "damn", "argh")
+  // ──────────────────────────────────────────────────────────────────────────
   if (currentIntent === 'VENTING_EXHAUSTION') {
+    if (activeTopic === 'PARENTAL_PRESSURE') {
+      return tryCandidates([
+        `That "ugh" says everything dost. Dealing with parental expectations while trying to manage your own life is exhausting down to the bone. You don't need to put on a polite filter here. What happened recently at home that brought this up?`,
+        `I feel that heavy sigh yaar. Take a deep breath. What is the hardest part about dealing with their expectations right now?`
+      ]);
+    }
     if (activeTopic === 'ACADEMIC_STRESS') {
-      return `That "ugh" says everything yaar. Academic burnout is so real — between classes, pending submissions, and exams, it feels like an endless treadmill. You don't have to explain in proper sentences right now. What is the single most annoying or exhausting thing on your plate today?`;
+      return tryCandidates([
+        `That "ugh" says everything yaar. Academic burnout is so real — between classes, pending submissions, and exams, it feels like an endless treadmill. You don't have to explain in proper sentences right now. What is the single most annoying or exhausting thing on your plate today?`,
+        `I hear that heavy sigh loud and clear dost. Sometimes you are just sick and tired of the endless routine. What would a truly peaceful day look like for you if you didn't have to worry about studies?`
+      ]);
     }
-    if (activeTopic === 'ANXIETY_PANIC') {
-      return `I feel that heavy "ugh" dost. When your mind is racing and feeling overwhelmed, even talking about it takes effort. No pressure at all. Just take a slow breath. What is feeling the heaviest right now?`;
-    }
-    return `That "ugh" speaks volumes dost. Sounds like you are just completely fed up or drained right now. You don't need to put on a filter here. Let it out — what is driving you up the wall today?`;
+    return tryCandidates([
+      `That "ugh" speaks volumes dost. Sounds like you are just completely fed up or drained right now. You don't need to put on a filter here. Let it out — what is driving you up the wall today?`,
+      `I feel that exhaustion with you yaar. When everything piles up, even words feel too heavy. I am right here listening.`
+    ]);
   }
 
-  // 3. CONFUSION OR SKEPTICISM ("what", "huh", "bruh", "makes no sense")
-  if (currentIntent === 'CONFUSION') {
-    return `Ha fair enough, let me reset! I promise no robotic lectures or complicated talk yaar. Tell me what is actually on your mind in your own words — whether it is college, life, or just needing to vent, I am listening!`;
-  }
-
-  // 4. GRATITUDE ("thank you", "thanks", "dhanyawad")
-  if (currentIntent === 'GRATITUDE') {
-    return `Anytime dost! Talking things out takes courage, and you did that today. Go easy on yourself, take a gentle stretch, and remember you have always got a safe space right here. Anything else you want to get off your chest before you go?`;
-  }
-
+  // ──────────────────────────────────────────────────────────────────────────
   // 5. AFFIRMATIONS ("yes", "yeah", "ok", "no", "hmm")
-  // Follow up on Sukhi's PREVIOUS question dynamically.
+  // ──────────────────────────────────────────────────────────────────────────
   if (currentIntent === 'AFFIRMATION') {
-    const lastLower = lastSukhi.toLowerCase();
+    if (lastSukhiLower.includes('compare') || lastSukhiLower.includes('relative')) {
+      return tryCandidates([
+        `That comparison trap is brutal dost. Being measured against someone else's marks or career ignores who you are and what you care about. It teaches us to doubt our own journey.
 
-    if (lastLower.includes('subject') || lastLower.includes('exam') || lastLower.includes('syllabus')) {
-      return `Got it yaar. When looking at that whole syllabus, our brain panics and tries to finish everything at once. What if we break it down into just one bite-sized piece for today? Which specific chapter or problem could you look at first without overwhelming yourself?`;
+When they bring up those comparisons, how does it make you feel inside — angry, guilty, or just completely numb?`,
+        `Comparison is the thief of joy, especially in an Indian household. Remember: their comparisons come from their own anxieties about status, not from your actual worth. What is something you are genuinely proud of about yourself?`
+      ]);
     }
-    if (lastLower.includes('breathe') || lastLower.includes('breath')) {
-      return `Glad you took that moment dost. Even a few seconds of breathing gives your nervous system a chance to reset. How does your body feel now compared to a few minutes ago?`;
+    if (lastSukhiLower.includes('subject') || lastSukhiLower.includes('syllabus')) {
+      return tryCandidates([
+        `Got it yaar. When looking at that whole syllabus, our brain panics and tries to finish everything at once. What if we break it down into just one bite-sized piece for today? Which specific chapter or problem could you look at first without overwhelming yourself?`,
+        `One step at a time dost. What is one small task you could complete in the next 30 minutes that would give you some peace of mind?`
+      ]);
     }
-    if (lastLower.includes('heaviest') || lastLower.includes('mind')) {
-      return `I am listening dost. Take your time and share whatever part comes naturally. What is on your mind?`;
+    if (lastSukhiLower.includes('talk') || lastSukhiLower.includes('bring it up')) {
+      return tryCandidates([
+        `It makes total sense why that feels so difficult. When communication at home feels like a one-way lecture, speaking up feels risky.
+
+Do you have any friends, cousins, or mentors who understand what you are going through and actually listen to you without judgment?`
+      ]);
     }
-    if (activeTopic === 'ACADEMIC_STRESS') {
-      return `Understood dost. Academic pressure is tough, but you don't have to carry the whole burden in one go. What is one small thing that would make today feel even 5% lighter for you?`;
-    }
-    return `I am right here with you dost. What is the next thing on your mind? Take your time, no rush at all.`;
+    return tryCandidates([
+      `I am right here with you dost. What is the next thing on your mind? Take your time, no rush at all.`,
+      `I'm listening yaar. Whatever is on your heart, you can lay it out here freely.`
+    ]);
   }
 
-  // 6. ACADEMIC STRESS (Key student reality)
-  if (currentIntent === 'ACADEMIC_STRESS' || (activeTopic === 'ACADEMIC_STRESS' && !['ANXIETY_PANIC', 'LONELINESS'].includes(currentIntent))) {
-    // If user specifically named their challenge
+  // ──────────────────────────────────────────────────────────────────────────
+  // 6. ACADEMIC STRESS
+  // ──────────────────────────────────────────────────────────────────────────
+  if (currentIntent === 'ACADEMIC_STRESS' || activeTopic === 'ACADEMIC_STRESS') {
+    // If user specifically talks about failure or marks
     if (lower.includes('fail') || lower.includes('backlog') || lower.includes('marks') || lower.includes('cgpa')) {
-      return `The fear of marks, backlogs, and grades can feel terrifyingly heavy dost. In our system, so much pressure gets tied to scores that it starts feeling like your whole future is on the line with every paper. But please remember — an exam score measures syllabus recall on one particular morning, not your worth or your potential as a person. Take a slow breath yaar. What is the exact situation right now? Let us look at it together calmly.`;
+      return tryCandidates([
+        `The fear of marks, backlogs, and grades can feel terrifyingly heavy dost. In our system, so much pressure gets tied to scores that it starts feeling like your whole future is on the line with every paper. But please remember — an exam score measures syllabus recall on one particular morning, not your worth or your potential as a person.
+
+Take a slow breath yaar. What is the exact situation right now? Let us look at it together calmly.`,
+        `A low score or a backlog feels like the world is ending in the moment, but so many people rebuild and succeed far beyond college marks. What is the specific test or subject that has you worried right now?`
+      ]);
     }
 
     if (lower.includes('syllabus') || lower.includes('behind') || lower.includes('pending') || lower.includes('assignment')) {
-      return `That feeling of being drowned in syllabus and deadlines is something almost every student goes through, but that doesn't make it any easier when you're the one facing it dost. The trick is to stop staring at the entire mountain. If you had to pick just ONE single topic or assignment to conquer today, which one would give you the biggest sense of relief?`;
+      return tryCandidates([
+        `That feeling of being drowned in syllabus and deadlines is something almost every student goes through, but that doesn't make it any easier when you're the one facing it dost. The trick is to stop staring at the entire mountain.
+
+If you had to pick just ONE single topic or assignment to conquer today, which one would give you the biggest sense of relief?`,
+        `When we feel behind, our instinct is to freeze and overthink. Let us take the pressure off: forget about the whole syllabus for the next hour. What is one tiny 15-minute section you can glance through?`
+      ]);
     }
 
-    if (userTurnCount > 2) {
-      return `Academic stress can feel like a cloud that follows you everywhere — even when you try to take a break, your mind whispers that you should be studying. Let us give you a genuine breather right now. Tell me dost: is this pressure coming mostly from internal expectations, parental pressure, or tough faculty deadlines?`;
+    // Progression: offer different insights based on turns
+    if (userTurnCount === 1 || userTurnCount === 2) {
+      return tryCandidates([
+        `Academic stress in college can feel relentless dost. Between lectures, assignments, pending submissions, and exams, it easily piles up until you feel suffocated.
+
+Tell me yaar — which part is pressing on you the hardest right now? Is it an upcoming test, back-to-back assignment deadlines, or just feeling behind on the syllabus?`,
+        `Academic pressure is so common yet feels so isolating when you are in the middle of it. What specific deadline or subject is taking up the most mental space for you right now?`
+      ]);
     }
 
-    // First time directly acknowledging academic stress
-    return `Academic stress in college can feel relentless dost. Between lectures, assignments, pending submissions, and exams, it easily piles up until you feel suffocated.
-Tell me yaar — which part is pressing on you the hardest right now? Is it an upcoming test, back-to-back assignment deadlines, or just feeling behind on the syllabus?`;
-  }
+    if (userTurnCount >= 3) {
+      return tryCandidates([
+        `Academic stress can feel like a cloud that follows you everywhere — even when you try to take a break, your mind whispers that you should be studying. Let us give you a genuine breather right now.
 
-  // 7. CODING / PROGRAMMING
-  if (currentIntent === 'CODING') {
-    return `Coding can be brilliant when things click, and deeply frustrating when a bug won't budge! What language or project are you working on right now dost? Tell me what you are trying to build or where you are stuck.`;
-  }
-
-  // 8. ANXIETY / PANIC
-  if (currentIntent === 'ANXIETY_PANIC') {
-    if (!offered.breathing478 && (lower.includes('panic') || lower.includes('palpitations') || lower.includes('cant breathe'))) {
-      return `I hear you dost — you are safe right now, and I am right here with you.
-Let us do a gentle breath together:
-Breathe in slowly through your nose for 4 counts...
-Hold gently for 4 counts...
-And release smoothly through your mouth for 6 counts.
-
-Your mind is sounding an alarm, but you are okay in this present moment. What is the main thought running through your mind right now?`;
+Tell me dost: is this pressure coming mostly from internal expectations, parental pressure, or tough faculty deadlines?`,
+        `When studies start consuming all your thoughts, it helps to pause and detach your identity from your student role for a moment. What is something you enjoy doing that reminds you of who you are outside of college marks?`,
+        `Carrying continuous academic stress takes a physical toll too — tight shoulders, poor sleep, tension headaches. Have you eaten properly today and drunk some water dost? Let us take care of your body first.`
+      ]);
     }
-    if (!offered.grounding3Things && userTurnCount > 2) {
-      return `When overthinking starts spinning out of control dost, trying to fight the thoughts only makes them louder. Let us bring your awareness back into the room: take a quick look around and name 3 simple objects you see right in front of you. Just notice them. How is your chest and breathing feeling?`;
-    }
-    return `Anxiety can make your whole body feel tense and on edge dost. You don't have to solve everything today. I am listening without any judgment — what is causing the biggest worry for you right now?`;
   }
 
-  // 9. LONELINESS / RELATIONSHIPS
-  if (currentIntent === 'LONELINESS') {
-    return `Feeling lonely or dealing with relationship hurts cuts very deep dost. College can be surrounded by hundreds of people and still feel like the loneliest place on earth. But you don't have to carry that silence alone — I am right here listening with an open heart. What happened that made you feel this way?`;
+  // ──────────────────────────────────────────────────────────────────────────
+  // 7. ANXIETY & PANIC
+  // ──────────────────────────────────────────────────────────────────────────
+  if (currentIntent === 'ANXIETY_PANIC' || activeTopic === 'ANXIETY_PANIC') {
+    return tryCandidates([
+      `Anxiety can make your whole body feel tense and on edge dost. When your mind races ahead to worst-case scenarios, remember: thoughts are not facts.
+
+You are safe right here in this moment. What is the main worry that keeps looping in your mind right now?`,
+      `When anxiety kicks into overdrive, trying to force yourself to calm down rarely works. Instead, let us ground your physical body: unclench your jaw, drop your shoulders, and feel your feet flat on the floor.
+
+What does this anxiety feel like for you — more like physical tension or racing thoughts?`
+    ]);
   }
 
-  // 10. SLEEP / EXHAUSTION
+  // ──────────────────────────────────────────────────────────────────────────
+  // 8. GENERAL INTENTS
+  // ──────────────────────────────────────────────────────────────────────────
+  if (currentIntent === 'CONFUSION') {
+    return tryCandidates([
+      `Ha fair enough, let me reset! I promise no robotic lectures or complicated talk yaar. Tell me what is actually on your mind in your own words — whether it is college, home, or just needing to vent, I am listening!`,
+      `My bad dost, let us keep it 100% real and simple. What is going on with you today?`
+    ]);
+  }
+
+  if (currentIntent === 'GRATITUDE') {
+    return tryCandidates([
+      `Anytime dost! Talking things out takes courage, and you did that today. Go easy on yourself, take a gentle stretch, and remember you have always got a safe space right here. Anything else you want to get off your chest before you go?`,
+      `You are so welcome yaar! Really glad we could chat. Remember to take things one moment at a time today.`
+    ]);
+  }
+
   if (currentIntent === 'SLEEP_EXHAUSTION') {
-    return `When your body is exhausted but your brain refuses to switch off, it is pure torture dost. Try unclenching your jaw, letting your shoulders drop down, and dimming your screen. What are the persistent thoughts that keep playing in your head when you try to rest?`;
+    return tryCandidates([
+      `When your body is exhausted but your brain refuses to switch off, it is pure torture dost. Try unclenching your jaw, letting your shoulders drop down, and dimming your screen. What are the persistent thoughts that keep playing in your head when you try to rest?`,
+      `Sleep trouble is our body's way of saying the mind is carrying too many open tabs. Let us park those tabs here for tonight. What is the heaviest thought keeping you awake?`
+    ]);
   }
 
-  // 11. SADNESS / LOW MOOD
-  if (currentIntent === 'SADNESS') {
-    return `I am right here with you dost. That heavy feeling in your chest is real, and it is completely okay not to be okay today. You don't have to pretend or force yourself to be cheerful here. When did this heaviness start creeping in?`;
+  if (currentIntent === 'LONELINESS') {
+    return tryCandidates([
+      `Feeling lonely or dealing with relationship hurts cuts very deep dost. College can be surrounded by hundreds of people and still feel like the loneliest place on earth. But you don't have to carry that silence alone — I am right here listening with an open heart. What happened that made you feel this way?`,
+      `That sense of isolation is real dost. Even when people are all around us, feeling unseen hurts. What is making you feel especially alone right now?`
+    ]);
   }
 
-  // 12. ANGER / FRUSTRATION
-  if (currentIntent === 'ANGER') {
-    return `That anger is completely valid dost. When things feel unfair or people cross boundaries, feeling furious is your mind's natural response. Let it all out here safely — what set this off?`;
-  }
-
-  // 13. GREETINGS (Only if very first turn)
-  if (/^(hi|hello|hey|namaste|hola|sup|yo)\b/i.test(lower) && userTurnCount <= 1) {
-    if (activeTopic === 'ACADEMIC_STRESS') {
-      return `Namaste dost! I'm Sukhi, your mindful companion on Kibou. I see you're dealing with academic stress today. You're definitely not alone in that — college pressure is real. What's on your mind right now?`;
-    }
-    return `Namaste dost! I'm Sukhi, your mindful companion on Kibou. Whether you are dealing with college stress, life troubles, or just need a safe space to vent, I am all ears. What is on your mind today?`;
-  }
-
-  // 14. GENERAL CONTEXTUAL REFLECTION
-  // Quote or reflect the user's specific statement and invite elaboration
+  // Fallback
   const cleanSnippet = text.length > 50 ? `${text.slice(0, 50)}...` : text;
-  return `I hear you when you say "${cleanSnippet}" dost. That makes total sense, and I want to understand more. Tell me what has been going on with this — what is the hardest part about it for you right now?`;
+  return tryCandidates([
+    `I hear you when you say "${cleanSnippet}" dost. That makes total sense, and I want to understand more. Tell me what has been going on with this — what is the hardest part about it for you right now?`,
+    `Thank you for sharing that with me dost. It sounds like there is a lot underneath "${cleanSnippet}". What would feel most helpful for you to talk through right now?`
+  ]);
 }
 
 /* =====================================================================
    MAIN SUKHI AI RESPONSE PIPELINE
    Priority 1: Groq LLM (llama-3.3-70b-versatile, ~300ms)
-   Priority 2: Pollinations AI Fast (openai-fast, 3.5s timeout)
-   Priority 3: Context-Trained Mental Health Dialogue Engine (Instant, 0ms)
+   Priority 2: Kibou Context-Trained Mental Health Dialogue Engine (Instant)
    ===================================================================== */
 
 export async function getSukhiResponse(userMessage, conversationHistory = [], roomTopic = '') {
@@ -453,8 +631,8 @@ export async function getSukhiResponse(userMessage, conversationHistory = [], ro
             messages,
             temperature: 0.7,
             max_tokens: 450,
-            presence_penalty: 0.4,
-            frequency_penalty: 0.3
+            presence_penalty: 0.5,
+            frequency_penalty: 0.4
           }),
           signal: AbortSignal.timeout(6000)
         });
@@ -463,43 +641,19 @@ export async function getSukhiResponse(userMessage, conversationHistory = [], ro
           const data = await res.json();
           let reply = data.choices?.[0]?.message?.content;
           if (reply?.trim()) {
-            // Strip any rogue emojis if model returns them
             reply = reply.replace(/[\u{1F300}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '');
-            return { content: reply.trim(), isCrisis: false };
+            if (!wasAlreadySaidBySukhi(reply, conversationHistory)) {
+              return { content: reply.trim(), isCrisis: false };
+            }
           }
         }
       } catch (e) {
-        // Try next model or fallback
         continue;
       }
     }
   }
 
-  // 3. Pollinations AI Fast (openai-fast with tight 3.5s timeout)
-  try {
-    const res = await fetch('https://text.pollinations.ai/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        messages,
-        seed: Math.floor(Math.random() * 1000000),
-        model: 'openai-fast'
-      }),
-      signal: AbortSignal.timeout(3500)
-    });
-
-    if (res.ok) {
-      let reply = await res.text();
-      if (reply && reply.trim() && !reply.startsWith('{') && reply.length > 10) {
-        reply = reply.replace(/[\u{1F300}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '');
-        return { content: reply.trim(), isCrisis: false };
-      }
-    }
-  } catch (e) {
-    // Falls through to Context Engine immediately
-  }
-
-  // 4. Kibou Context-Trained Mental Health Dialogue Engine (Instant fallback)
+  // 3. Kibou Context-Trained Mental Health Dialogue Engine (Instant fallback with Zero-Repetition Guarantee)
   const contextualReply = generateContextualLocalResponse(userMessage, conversationHistory, roomTopic);
   return {
     content: contextualReply,
