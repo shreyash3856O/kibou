@@ -200,11 +200,18 @@ export default function ChatRoom() {
         justifyContent: 'space-between'
       }}>
         <div>
-          <div style={{ fontWeight: '700', fontSize: '0.9rem' }}>
-            {activeConversation?.topic || 'Chat'}
+          <div style={{ fontWeight: '700', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span>{activeConversation?.topic || 'Chat'}</span>
+            {(activeConversation?.helper_session_id === 'sukhi_ai_helper' || activeConversation?.is_ai) && (
+              <span style={{ fontSize: '0.65rem', backgroundColor: 'var(--btn-accent-bg)', color: '#fff', padding: '1px 6px', borderRadius: '8px' }}>
+                AI Companion
+              </span>
+            )}
           </div>
           <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-            Encrypted session
+            {(activeConversation?.helper_session_id === 'sukhi_ai_helper' || activeConversation?.is_ai)
+              ? '🧘 Sukhi (Mindful AI Peer)'
+              : '🔒 Encrypted peer session'}
           </div>
         </div>
 
@@ -233,7 +240,7 @@ export default function ChatRoom() {
           alignItems: 'center'
         }}>
           <div>
-            <strong>Crisis Support:</strong> Call/Text 988 or Text HOME to 741741.
+            <strong>Crisis Support:</strong> Call Tele-MANAS (14416), KIRAN (1800-599-0019), or Shreyash (7304167033).
           </div>
           <button onClick={() => setShowHotlinesModal(true)} className="btn btn-secondary" style={{ padding: '2px 8px', fontSize: '0.72rem' }}>
             Hotlines
@@ -250,14 +257,14 @@ export default function ChatRoom() {
               <div style={{ fontSize: '0.68rem', color: isMe ? 'rgba(0,0,0,0.6)' : 'var(--text-muted)', marginBottom: '2px' }}>
                 {m.sender_alias || (isMe ? 'You' : 'Peer')}
               </div>
-              <div>{m.content}</div>
+              <div style={{ whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>{m.content}</div>
             </div>
           );
         })}
 
         {isPeerTyping && (
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-            Peer is typing...
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span>{(activeConversation?.helper_session_id === 'sukhi_ai_helper' || activeConversation?.is_ai) ? '🧘 Sukhi is reflecting...' : 'Peer is typing...'}</span>
           </div>
         )}
         <div ref={messagesEndRef} />

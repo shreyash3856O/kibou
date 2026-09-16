@@ -111,6 +111,30 @@ export default function SeekerDashboard() {
     }
   };
 
+  const handleStartSukhi = async () => {
+    try {
+      setLoading(true);
+      let session = seekerSession;
+      if (!session) {
+        session = await initSeekerSession();
+      }
+
+      const res = await api.startSukhiConversation(
+        session.session_id,
+        selectedTopic,
+        promptText,
+        session.alias
+      );
+
+      setActiveConversation(res.conversation);
+      setCurrentView('chat');
+    } catch (err) {
+      alert('Failed to connect with Sukhi: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleCancel = async () => {
     if (waitingConversation && seekerSession) {
       await api.endConversation(waitingConversation.conversation_id, seekerSession.session_id, 'seeker').catch(() => {});
@@ -150,12 +174,32 @@ export default function SeekerDashboard() {
           <div style={{ fontWeight: '700', fontSize: '1.2rem', marginBottom: '8px' }}>
             Finding an available Helper
           </div>
-          <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '20px' }}>
+          <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
             Topic: {waitingConversation.topic}
           </div>
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-faint)', marginBottom: '24px' }}>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-faint)', marginBottom: '20px' }}>
             Please hold on. You will be connected as soon as an online helper accepts.
           </p>
+
+          <div style={{ padding: '14px', backgroundColor: 'rgba(99, 102, 241, 0.08)', borderRadius: '8px', border: '1px solid var(--border-color)', marginBottom: '20px', textAlign: 'left' }}>
+            <div style={{ fontWeight: '700', fontSize: '0.9rem', marginBottom: '4px', color: 'var(--text-primary)' }}>
+              🧘 Don't want to wait?
+            </div>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '10px', lineHeight: '1.4' }}>
+              <strong>Sukhi</strong>, your mindful AI peer friend, is online 24/7. Always here for gentle perspective, mindful venting, and compassionate listening.
+            </p>
+            <button
+              onClick={() => {
+                handleCancel();
+                handleStartSukhi();
+              }}
+              className="btn btn-accent btn-block"
+              style={{ padding: '8px 12px', fontSize: '0.85rem' }}
+            >
+              ✨ Talk to Sukhi (Instant AI Companion)
+            </button>
+          </div>
+
           <button onClick={handleCancel} className="btn btn-secondary">
             Cancel Request
           </button>
@@ -163,12 +207,40 @@ export default function SeekerDashboard() {
       ) : (
         /* Seeker Form */
         <div>
+          {/* Sukhi Featured Card */}
+          <div 
+            onClick={handleStartSukhi}
+            className="flat-card" 
+            style={{ 
+              cursor: 'pointer',
+              background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(168, 85, 247, 0.12) 100%)',
+              border: '1px solid rgba(99, 102, 241, 0.3)',
+              marginBottom: '20px',
+              padding: '14px 16px'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '700', fontSize: '0.95rem' }}>
+                  <span>🧘 Meet Sukhi (AI Companion)</span>
+                  <span style={{ fontSize: '0.68rem', backgroundColor: 'var(--btn-accent-bg)', color: '#fff', padding: '1px 6px', borderRadius: '10px' }}>24/7 Instant</span>
+                </div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '3px' }}>
+                  Warm, mindful, and culturally tuned peer listener. No waiting required.
+                </div>
+              </div>
+              <button className="btn btn-accent" style={{ padding: '6px 12px', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
+                Chat Now ➔
+              </button>
+            </div>
+          </div>
+
           <div style={{ marginBottom: '16px' }}>
             <div style={{ fontSize: '1.15rem', fontWeight: '700', marginBottom: '4px' }}>
               Select a Topic
             </div>
             <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-              Choose what you would like to talk about today.
+              Or match with a peer student helper.
             </div>
           </div>
 
@@ -201,14 +273,26 @@ export default function SeekerDashboard() {
             />
           </div>
 
-          <button
-            onClick={handleRequestMatch}
-            disabled={loading}
-            className="btn btn-primary btn-block"
-            style={{ padding: '14px', fontSize: '1rem' }}
-          >
-            {loading ? 'Finding Match...' : 'Find Helper'}
-          </button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              onClick={handleRequestMatch}
+              disabled={loading}
+              className="btn btn-primary"
+              style={{ flex: 1, padding: '12px', fontSize: '0.95rem' }}
+            >
+              {loading ? 'Finding Match...' : 'Find Peer Helper'}
+            </button>
+
+            <button
+              onClick={handleStartSukhi}
+              disabled={loading}
+              className="btn btn-accent"
+              style={{ padding: '12px 16px', fontSize: '0.95rem' }}
+              title="Chat instantly with Sukhi AI"
+            >
+              ✨ Talk with Sukhi
+            </button>
+          </div>
 
           <div style={{ textAlign: 'center', marginTop: '16px', fontSize: '0.75rem', color: 'var(--text-faint)' }}>
             100% Anonymous. No account or email needed.

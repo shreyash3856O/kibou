@@ -287,6 +287,20 @@ export async function initializeDatabase() {
     );
   }
 
+  // Ensure Sukhi AI Helper is registered as an available 24/7 companion
+  const sukhiSession = {
+    session_id: 'sukhi_ai_helper',
+    user_role: 'helper',
+    alias: 'Sukhi (AI Companion)',
+    ip_address: '127.0.0.1',
+    topics: ['General Venting', 'Academic Stress', 'Anxiety & Panic', 'Relationships', 'Mindfulness'],
+    is_available: true,
+    is_banned: false,
+    is_ai: true,
+    created_at: new Date().toISOString()
+  };
+  saveSession(sukhiSession);
+
   if (!db.banned_ips) db.banned_ips = [];
 }
 

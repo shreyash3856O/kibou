@@ -24,6 +24,7 @@ import {
   addAuditLog,
   saveDatabase
 } from './db.js';
+import { getSukhiResponse, SUKHI_SESSION_ID, SUKHI_ALIAS } from './sukhi.js';
 
 const router = express.Router();
 
@@ -319,6 +320,83 @@ router.post('/conversations/start', async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ error: 'Failed to start conversation: ' + err.message });
+  }
+});
+
+router.post('/conversations/start-sukhi', async (req, res) => {
+  try {
+    const { seeker_session_id, seeker_alias, topic, initial_prompt } = req.body;
+
+    let seeker = findSessionById(seeker_session_id);
+    if (!seeker && seeker_session_id) {
+      seeker = await findOrRecoverSession(seeker_session_id, 'seeker', seeker_alias || 'Anonymous Seeker');
+    }
+    if (!seeker) {
+      return res.status(404).json({ error: 'Seeker session not found' });
+    }
+
+    const conversationId = uuidv4();
+    const crisisCheck = detectCrisis(initial_prompt || '');
+
+    const conversation = {
+      conversation_id: conversationId,
+      seeker_session_id: seeker.session_id,
+      seeker_alias: seeker.alias,
+      seeker_ip: seeker.ip_address || getClientIp(req),
+      helper_session_id: SUKHI_SESSION_ID,
+      helper_alias: SUKHI_ALIAS,
+      helper_ip: '127.0.0.1',
+      topic: topic || 'Mindful Venting with Sukhi',
+      initial_prompt: initial_prompt || '',
+      status: 'active',
+      is_ai: true,
+      matched_at: new Date().toISOString(),
+      ended_at: null,
+      is_escalated: false,
+      is_crisis_flagged: crisisCheck.isCrisis,
+      crisis_keywords: crisisCheck.matchedKeywords,
+      created_at: new Date().toISOString()
+    };
+
+    saveConversation(conversation);
+
+    if (initial_prompt && initial_prompt.trim()) {
+      addMessage({
+        conversation_id: conversationId,
+        sender_session_id: seeker.session_id,
+        sender_alias: seeker.alias,
+        sender_role: 'seeker',
+        content_encrypted: encryptMessage(initial_prompt),
+        is_crisis_keyword_detected: crisisCheck.isCrisis
+      });
+
+      const sukhiGreeting = await getSukhiResponse(initial_prompt, []);
+      addMessage({
+        conversation_id: conversationId,
+        sender_session_id: SUKHI_SESSION_ID,
+        sender_alias: SUKHI_ALIAS,
+        sender_role: 'helper',
+        content_encrypted: encryptMessage(sukhiGreeting.content),
+        is_crisis_keyword_detected: sukhiGreeting.isCrisis
+      });
+    } else {
+      const opening = "Namaste dost! I'm Sukhi, your mindful companion on Kibou. Whether you're feeling stressed, overwhelmed, or just need to vent over a virtual cup of chai, I'm right here with you. What's on your mind today?";
+      addMessage({
+        conversation_id: conversationId,
+        sender_session_id: SUKHI_SESSION_ID,
+        sender_alias: SUKHI_ALIAS,
+        sender_role: 'helper',
+        content_encrypted: encryptMessage(opening),
+        is_crisis_keyword_detected: false
+      });
+    }
+
+    res.json({
+      success: true,
+      conversation
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to start Sukhi chat: ' + err.message });
   }
 });
 

@@ -3,10 +3,12 @@ import {
   findConversationById,
   saveConversation,
   addMessage,
+  getMessagesByConversationId,
   findSessionById,
   getDb,
   saveDatabase
 } from './db.js';
+import { getSukhiResponse, SUKHI_SESSION_ID, SUKHI_ALIAS } from './sukhi.js';
 import { v4 as uuidv4 } from 'uuid';
 
 // Session to socket mapping for direct targeting
@@ -182,6 +184,63 @@ export function setupSocketIO(io) {
         }
 
         if (callback) callback({ success: true, message: payload });
+
+        // Trigger Sukhi AI automated mindful response if chatting with Sukhi
+        if ((conv.helper_session_id === SUKHI_SESSION_ID || conv.is_ai) && sender_role === 'seeker') {
+          const room = `conv-${conversation_id}`;
+          
+          // Emit typing indicator from Sukhi
+          io.to(room).emit('user_typing', {
+            isTyping: true,
+            sender_alias: SUKHI_ALIAS,
+            sender_role: 'helper'
+          });
+
+          // Fetch recent conversation history
+          const dbMsgs = getMessagesByConversationId(conversation_id);
+          const decryptedHistory = dbMsgs.map((m) => ({
+            sender_role: m.sender_role,
+            content: decryptMessage(m.content_encrypted)
+          }));
+
+          setTimeout(async () => {
+            try {
+              const sukhiReply = await getSukhiResponse(content, decryptedHistory);
+              const encReply = encryptMessage(sukhiReply.content);
+
+              const sukhiMsg = addMessage({
+                conversation_id,
+                sender_session_id: SUKHI_SESSION_ID,
+                sender_alias: SUKHI_ALIAS,
+                sender_role: 'helper',
+                content_encrypted: encReply,
+                is_crisis_keyword_detected: sukhiReply.isCrisis
+              });
+
+              // Stop typing
+              io.to(room).emit('user_typing', {
+                isTyping: false,
+                sender_alias: SUKHI_ALIAS,
+                sender_role: 'helper'
+              });
+
+              // Emit new message
+              io.to(room).emit('new_message', {
+                message_id: sukhiMsg.message_id,
+                conversation_id,
+                sender_session_id: SUKHI_SESSION_ID,
+                sender_alias: SUKHI_ALIAS,
+                sender_role: 'helper',
+                content: sukhiReply.content,
+                created_at: sukhiMsg.created_at,
+                is_crisis_keyword_detected: sukhiReply.isCrisis
+              });
+            } catch (e) {
+              console.error('Sukhi AI response error:', e);
+              io.to(room).emit('user_typing', { isTyping: false });
+            }
+          }, 800);
+        }
       } catch (err) {
         console.error('Socket send_message error:', err);
         if (callback) callback({ error: err.message });

@@ -83,6 +83,12 @@ export const api = {
       body: JSON.stringify({ seeker_session_id, topic, initial_prompt, helper_session_id, seeker_alias })
     }, 'seeker'),
 
+  startSukhiConversation: (seeker_session_id, topic, initial_prompt, seeker_alias) =>
+    request('/conversations/start-sukhi', {
+      method: 'POST',
+      body: JSON.stringify({ seeker_session_id, topic, initial_prompt, seeker_alias })
+    }, 'seeker'),
+
   getWaitingConversations: () => request('/conversations/waiting', {}, 'helper'),
 
   acceptConversation: (conversation_id, helper_session_id, helper_alias) =>
