@@ -196,12 +196,16 @@ export function setupSocketIO(io) {
             sender_role: 'helper'
           });
 
-          // Fetch recent conversation history
+          // Fetch conversation history EXCLUDING the latest user message
+          // (current message is already passed separately as `content` to getSukhiResponse)
           const dbMsgs = getMessagesByConversationId(conversation_id);
-          const decryptedHistory = dbMsgs.map((m) => ({
-            sender_role: m.sender_role,
-            content: decryptMessage(m.content_encrypted)
-          }));
+          const decryptedHistory = dbMsgs
+            .slice(0, -1) // exclude the very last message (the current user msg just saved)
+            .map((m) => ({
+              sender_role: m.sender_role,
+              content: decryptMessage(m.content_encrypted)
+            }))
+            .filter((m) => m.content && m.content.trim().length > 0);
 
           setTimeout(async () => {
             try {
