@@ -163,7 +163,7 @@ export function setupSocketIO(io) {
           io.to(room).emit('crisis_detected', {
             type: 'CRISIS_DETECTED',
             matched_keywords: crisisCheck.matchedKeywords,
-            message: 'Crisis support is available 24/7. Call or text 988 (Lifeline) or text HOME to 741741.',
+            message: 'Crisis support is available 24/7. Call Tele-MANAS at 14416, KIRAN at 1800-599-0019, or contact Shreyash Chaturvedi at 7304167033.',
             guidance_for_helper: 'The seeker may be in crisis. Listen without judgment, remind them of your peer limits, and offer to escalate to campus counselors.',
             conversation_id
           });

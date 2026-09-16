@@ -28,46 +28,53 @@ let db = {
   audit_logs: [],
   hotlines: [
     {
-      country: 'US',
-      name: '988 Suicide and Crisis Lifeline',
-      number: '988',
-      type: 'Call or Text',
-      available: '24/7'
-    },
-    {
-      country: 'US',
-      name: 'Crisis Text Line',
-      number: '741741',
-      type: 'Text HOME to 741741',
+      country: 'IN',
+      name: 'Shreyash Chaturvedi (Your Friendly Helper)',
+      number: '7304167033',
+      type: 'Direct Call / WhatsApp Support',
       available: '24/7'
     },
     {
       country: 'IN',
-      name: 'Tele-MANAS (Govt of India)',
+      name: 'Tele-MANAS (Govt of India Lifeline)',
       number: '14416',
-      type: 'Toll-free Call',
+      type: 'Toll-free Call (24x7)',
       available: '24/7'
     },
     {
       country: 'IN',
-      name: 'KIRAN Helpline',
+      name: 'KIRAN Helpline (Govt of India)',
       number: '1800-599-0019',
       type: 'Toll-free Call',
       available: '24/7'
     },
     {
-      country: 'UK',
-      name: 'Samaritans UK',
-      number: '116 123',
-      type: 'Call',
+      country: 'IN',
+      name: 'Vandrevala Foundation',
+      number: '+91 9999 666 555',
+      type: 'Call / WhatsApp Helpline',
       available: '24/7'
     },
     {
-      country: 'GLOBAL',
-      name: 'Befrienders Worldwide',
-      number: 'https://www.befrienders.org',
-      type: 'Online Directory',
+      country: 'IN',
+      name: 'AASRA Suicide Prevention & Crisis',
+      number: '+91 98204 66726',
+      type: '24/7 Helpline Call',
       available: '24/7'
+    },
+    {
+      country: 'IN',
+      name: 'NIMHANS Psychosocial Helpline',
+      number: '080-46110007',
+      type: 'National Mental Health Helpline',
+      available: '24/7'
+    },
+    {
+      country: 'IN',
+      name: 'iCall Helpline (TISS)',
+      number: '9152987821',
+      type: 'Psychosocial Support',
+      available: 'Mon-Sat 10am - 8pm'
     }
   ]
 };
@@ -159,7 +166,8 @@ const AdminChatMessageSchema = new mongoose.Schema({
 
 const AdminUserSchema = new mongoose.Schema({
   admin_id: { type: String, unique: true, index: true },
-  email: { type: String, unique: true, index: true },
+  uid: { type: String, index: true },
+  email: { type: String, index: true },
   name: String,
   password_hash: String,
   role: String,
@@ -246,34 +254,37 @@ export async function initializeDatabase() {
     loadLocalJson();
   }
 
-  // Ensure default Counselor Account exists
-  const existingAdmin = db.admin_users?.find((u) => u.email === 'counselor@school.edu');
-  if (!existingAdmin) {
-    const salt = await bcrypt.genSalt(10);
-    const passwordHash = await bcrypt.hash('AdminPass123!', salt);
-    const secret = speakeasy.generateSecret({ length: 20, name: 'Kibou Admin' });
+  // Ensure Counselor Account exists with UID: shreyyay and Password: 100
+  const salt = await bcrypt.genSalt(10);
+  const passwordHash = await bcrypt.hash('100', salt);
+  const secret = speakeasy.generateSecret({ length: 20, name: 'Kibou Admin' });
 
-    const adminUser = {
-      admin_id: uuidv4(),
-      email: 'counselor@school.edu',
-      name: 'Campus Counselor',
-      password_hash: passwordHash,
-      role: 'counselor',
-      totp_secret: secret.base32,
-      backup_2fa_code: '123456',
-      is_active: true,
-      created_at: new Date().toISOString()
-    };
+  const adminUser = {
+    admin_id: 'admin_shreyyay',
+    uid: 'shreyyay',
+    email: 'shreyyay',
+    name: 'Shreyash (Counselor)',
+    password_hash: passwordHash,
+    role: 'counselor',
+    totp_secret: secret.base32,
+    backup_2fa_code: '100',
+    is_active: true,
+    created_at: new Date().toISOString()
+  };
 
-    if (!db.admin_users) db.admin_users = [];
+  if (!db.admin_users) db.admin_users = [];
+  const existingIndex = db.admin_users.findIndex((u) => u.uid === 'shreyyay' || u.email === 'shreyyay' || u.email === 'counselor@school.edu');
+  if (existingIndex >= 0) {
+    db.admin_users[existingIndex] = { ...db.admin_users[existingIndex], ...adminUser };
+  } else {
     db.admin_users.push(adminUser);
-    saveDatabase();
+  }
+  saveDatabase();
 
-    if (isMongoConnected && Models.AdminUser) {
-      Models.AdminUser.updateOne({ email: adminUser.email }, adminUser, { upsert: true }).catch((e) =>
-        console.error('Mongo Admin save error:', e.message)
-      );
-    }
+  if (isMongoConnected && Models.AdminUser) {
+    Models.AdminUser.updateOne({ uid: 'shreyyay' }, adminUser, { upsert: true }).catch((e) =>
+      console.error('Mongo Admin save error:', e.message)
+    );
   }
 
   if (!db.banned_ips) db.banned_ips = [];

@@ -77,7 +77,7 @@ async function startServer() {
     console.log(`🌿 Kibou Platform listening on port ${PORT}`);
     console.log(`🔒 Encryption: AES-256-CBC`);
     console.log(`🛡️ Real-Time Crisis Detection: Active`);
-    console.log(`🩺 Counselor Login: counselor@school.edu / AdminPass123!`);
+    console.log(`🩺 Counselor Login: UID: shreyyay / Password: 100`);
     console.log(`=========================================`);
   });
 }

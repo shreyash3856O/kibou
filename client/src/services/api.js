@@ -58,10 +58,10 @@ export const api = {
 
   getMe: (role) => request('/auth/me', {}, role),
 
-  adminLogin: (email, password) =>
+  adminLogin: (uid, password) =>
     request('/auth/admin/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify({ uid, email: uid, password })
     }),
 
   admin2faVerify: (admin_id, code) =>
