@@ -25,6 +25,7 @@ import {
   saveDatabase
 } from './db.js';
 import { getSukhiResponse, setGroqApiKey, getAiStatus, SUKHI_SESSION_ID, SUKHI_ALIAS } from './sukhi.js';
+import { notifySessionBanned } from './socket.js';
 
 const router = express.Router();
 
@@ -704,13 +705,18 @@ router.post('/admin/reports/:id/action', requireAdmin, (req, res) => {
     if (action === 'ban_user') {
       if (target_session_id) {
         const session = findSessionById(target_session_id);
-        if (session) session.is_banned = true;
+        if (session) {
+          session.is_banned = true;
+          saveSession(session);
+          // Kick the banned user out of any live chat immediately
+          notifySessionBanned(target_session_id);
+        }
       }
       addAuditLog(req.admin.admin_id, 'BAN_USER', target_session_id || '', `Banned via report ${report.report_id}`);
     }
 
     saveDatabase();
-    res.json({ success: true, report });
+    res.json({ success: true, report, banned_session_id: action === 'ban_user' ? target_session_id || null : null });
   } catch (err) {
     res.status(500).json({ error: 'Action failed: ' + err.message });
   }
@@ -763,6 +769,7 @@ router.post('/admin/users/:sessionId/ban', requireAdmin, (req, res) => {
 
   session.is_banned = true;
   saveSession(session);
+  notifySessionBanned(session.session_id);
   addAuditLog(req.admin.admin_id, 'BAN_SESSION', session.session_id, 'Manual session ban');
 
   res.json({ success: true, session });

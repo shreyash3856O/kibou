@@ -276,6 +276,83 @@ body {
   display: flex;
   flex-direction: column;
   height: calc(100vh - 60px);
+  height: calc(100dvh - 60px);
+  overflow: hidden;
+}
+
+/* Sticky chat top bar — stays pinned, shrinks once you scroll */
+.chat-topbar {
+  padding: 10px 14px;
+  background-color: var(--bg-card);
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  flex-shrink: 0;
+  transition: padding 0.22s ease, box-shadow 0.22s ease;
+}
+
+.chat-topbar.compact {
+  padding: 5px 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.28);
+}
+
+.chat-topbar-info {
+  min-width: 0;
+  flex: 1;
+}
+
+.chat-topic {
+  font-weight: 700;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: font-size 0.22s ease;
+}
+
+.chat-topbar.compact .chat-topic {
+  font-size: 0.76rem;
+}
+
+.chat-sub {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: font-size 0.22s ease, opacity 0.22s ease;
+  max-height: 20px;
+}
+
+.chat-topbar.compact .chat-sub {
+  font-size: 0.62rem;
+  opacity: 0.8;
+}
+
+.chat-topbar-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.chat-topbar-actions .btn {
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  border-radius: 7px;
+  transition: padding 0.22s ease, font-size 0.22s ease;
+}
+
+.chat-topbar.compact .chat-topbar-actions .btn {
+  padding: 2px 7px;
+  font-size: 0.68rem;
 }
 
 .chat-messages {

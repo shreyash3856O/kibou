@@ -13,11 +13,12 @@ const TOPICS = [
 ];
 
 export default function SeekerDashboard() {
-  const { 
-    seekerSession, 
-    initSeekerSession, 
-    setActiveConversation, 
-    setCurrentView 
+  const {
+    seekerSession,
+    initSeekerSession,
+    setActiveConversation,
+    setCurrentView,
+    bannedInfo
   } = useApp();
 
   const [selectedTopic, setSelectedTopic] = useState(TOPICS[0]);
@@ -27,10 +28,10 @@ export default function SeekerDashboard() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!seekerSession) {
+    if (!seekerSession && !bannedInfo) {
       initSeekerSession();
     }
-  }, [seekerSession]);
+  }, [seekerSession, bannedInfo]);
 
   const loadState = async () => {
     if (!seekerSession) return;
@@ -60,6 +61,10 @@ export default function SeekerDashboard() {
       let session = seekerSession;
       if (!session) {
         session = await initSeekerSession();
+      }
+      if (!session) {
+        alert('Your access has been restricted by a moderator.');
+        return;
       }
 
       let res;
@@ -117,6 +122,10 @@ export default function SeekerDashboard() {
       let session = seekerSession;
       if (!session) {
         session = await initSeekerSession();
+      }
+      if (!session) {
+        alert('Your access has been restricted by a moderator.');
+        return;
       }
 
       const res = await api.startSukhiConversation(

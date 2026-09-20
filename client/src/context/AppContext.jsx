@@ -21,6 +21,16 @@ export function AppProvider({ children }) {
 
   const [hotlines, setHotlines] = useState([]);
 
+  // Set when the server rejects a session as banned — blocks all app access
+  const [bannedInfo, setBannedInfo] = useState(null);
+
+  const clearStoredSession = (role) => {
+    localStorage.removeItem(`${role}_session`);
+    localStorage.removeItem(`${role}_token`);
+    if (role === 'seeker') setSeekerSession(null);
+    else setHelperSession(null);
+  };
+
   // Apply theme to html root
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -35,6 +45,23 @@ export function AppProvider({ children }) {
   useEffect(() => {
     api.getHotlines().then((res) => setHotlines(res.hotlines || [])).catch(() => {});
 
+    // Returns { banned: true } when the server rejects the stored session as banned.
+    // In that case we must NOT mint a fresh session — the user stays locked out.
+    const verifyStoredSession = async (role, parsed) => {
+      const me = await api.getMe(role).catch((err) => {
+        if (err?.status === 403 && err?.data?.is_banned) {
+          clearStoredSession(role);
+          setBannedInfo({
+            session_id: parsed?.session_id || null,
+            message: 'Your access has been restricted by a moderator.'
+          });
+          return { banned: true };
+        }
+        return null;
+      });
+      return me;
+    };
+
     const validateAndRestoreSessions = async () => {
       // 1. Helper session validation
       const storedHelper = localStorage.getItem('helper_session');
@@ -43,12 +70,12 @@ export function AppProvider({ children }) {
           const parsed = JSON.parse(storedHelper);
           setHelperSession(parsed);
           // Verify with server
-          const me = await api.getMe('helper').catch(() => null);
+          const me = await verifyStoredSession('helper', parsed);
           if (me?.session) {
             setHelperSession(me.session);
             localStorage.setItem('helper_session', JSON.stringify(me.session));
-          } else {
-            // Re-initialize if stale
+          } else if (!me?.banned && !bannedInfo) {
+            // Re-initialize if stale (never when banned)
             await initHelperSession();
           }
         } catch (e) {
@@ -65,11 +92,11 @@ export function AppProvider({ children }) {
           const parsed = JSON.parse(storedSeeker);
           setSeekerSession(parsed);
           // Verify with server
-          const me = await api.getMe('seeker').catch(() => null);
+          const me = await verifyStoredSession('seeker', parsed);
           if (me?.session) {
             setSeekerSession(me.session);
             localStorage.setItem('seeker_session', JSON.stringify(me.session));
-          } else {
+          } else if (!me?.banned && !bannedInfo) {
             await initSeekerSession();
           }
         } catch (e) {
@@ -118,13 +145,39 @@ export function AppProvider({ children }) {
     };
 
     socket.on('conversation_matched', handleMatch);
+
+    // Instant moderator ban kick — lock out the matching session immediately
+    const handleSessionBanned = (data) => {
+      const bannedId = data?.session_id;
+      let matched = false;
+      if (bannedId && seekerSession?.session_id === bannedId) {
+        clearStoredSession('seeker');
+        matched = true;
+      }
+      if (bannedId && helperSession?.session_id === bannedId) {
+        clearStoredSession('helper');
+        matched = true;
+      }
+      if (matched || !bannedId) {
+        setBannedInfo({
+          session_id: bannedId || null,
+          message: data?.message || 'Your access has been restricted by a moderator.'
+        });
+        setCurrentView('main');
+        setActiveConversation(null);
+      }
+    };
+
+    socket.on('session_banned', handleSessionBanned);
     return () => {
       socket.off('connect', registerCurrent);
       socket.off('conversation_matched', handleMatch);
+      socket.off('session_banned', handleSessionBanned);
     };
   }, [seekerSession, helperSession, activeTab, adminUser]);
 
   const initSeekerSession = async () => {
+    if (bannedInfo) return null;
     try {
       const res = await api.createAnonSession('seeker');
       setSeekerSession(res.session);
@@ -137,6 +190,7 @@ export function AppProvider({ children }) {
   };
 
   const initHelperSession = async () => {
+    if (bannedInfo) return null;
     try {
       const res = await api.createAnonSession('helper');
       setHelperSession(res.session);
@@ -187,7 +241,9 @@ export function AppProvider({ children }) {
         setShowBreathingModal,
         showFacultyChatModal,
         setShowFacultyChatModal,
-        hotlines
+        hotlines,
+        bannedInfo,
+        setBannedInfo
       }}
     >
       {children}

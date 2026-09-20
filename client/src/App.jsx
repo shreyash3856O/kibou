@@ -11,7 +11,7 @@ import BreathingModal from './components/BreathingModal';
 import FacultyChatModal from './components/FacultyChatModal';
 
 export default function App() {
-  const { currentView, setCurrentView, activeTab, adminUser } = useApp();
+  const { currentView, setCurrentView, activeTab, adminUser, bannedInfo } = useApp();
 
   // When admin logs in, immediately switch to admin view
   useEffect(() => {
@@ -19,6 +19,28 @@ export default function App() {
       setCurrentView('admin');
     }
   }, [adminUser]);
+
+  // Banned users see only the restriction notice — no chat, no dashboards
+  if (bannedInfo && !adminUser) {
+    return (
+      <div className="mobile-app">
+        <Header />
+        <main style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '24px 16px' }}>
+          <div className="flat-card" style={{ textAlign: 'center', margin: 'auto 0', borderLeft: '4px solid #dc2626' }}>
+            <div style={{ fontWeight: '700', fontSize: '1.15rem', marginBottom: '8px' }}>
+              Access Restricted
+            </div>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: '1.5', marginBottom: '12px' }}>
+              {bannedInfo.message || 'Your access has been restricted by a moderator.'}
+            </p>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-faint)' }}>
+              If you believe this is a mistake, please reach out to the campus counseling team.
+            </p>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="mobile-app">

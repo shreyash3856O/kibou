@@ -26,13 +26,16 @@ export default function ChatRoom() {
   const [inputText, setInputText] = useState('');
   const [isPeerTyping, setIsPeerTyping] = useState(false);
   const [isLocalTyping, setIsLocalTyping] = useState(false);
+  const [topbarCompact, setTopbarCompact] = useState(false);
   const [isCrisisActive, setIsCrisisActive] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportReason, setReportReason] = useState('unsafe_behavior');
   const [reportDescription, setReportDescription] = useState('');
   const [conversationEnded, setConversationEnded] = useState(false);
+  const [isBanned, setIsBanned] = useState(false);
 
   const messagesEndRef = useRef(null);
+  const messagesRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const localTypingTimeoutRef = useRef(null);
 
@@ -43,6 +46,7 @@ export default function ChatRoom() {
     }
 
     const convId = activeConversation.conversation_id;
+    setTopbarCompact(false);
 
     api.getConversationMessages(convId)
       .then((res) => {
@@ -79,6 +83,18 @@ export default function ChatRoom() {
       setIsPeerTyping(Boolean(data.isTyping));
     });
 
+    socket.on('session_banned', (data) => {
+      if (!data?.session_id || data.session_id === session?.session_id) {
+        setIsBanned(true);
+        setConversationEnded(true);
+        socket.emit('leave_conversation', {
+          conversation_id: convId,
+          session_id: session?.session_id,
+          alias: session?.alias
+        });
+      }
+    });
+
     socket.on('conversation_ended', (data) => {
       if (data.conversation_id === convId) {
         setConversationEnded(true);
@@ -101,6 +117,7 @@ export default function ChatRoom() {
       socket.off('new_message');
       socket.off('crisis_detected');
       socket.off('user_typing');
+      socket.off('session_banned');
       socket.off('conversation_ended');
       socket.off('conversation_escalated');
     };
@@ -202,39 +219,27 @@ export default function ChatRoom() {
   return (
     <div className="chat-container">
       
-      {/* Top Bar for Chat Room */}
-      <div style={{
-        padding: '10px 14px',
-        backgroundColor: 'var(--bg-card)',
-        borderBottom: '1px solid var(--border-color)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between'
-      }}>
-        <div>
-          <div style={{ fontWeight: '700', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+      {/* Top Bar for Chat Room — sticky, compacts on scroll */}
+      <div className={`chat-topbar${topbarCompact ? ' compact' : ''}`}>
+        <div className="chat-topbar-info">
+          <div className="chat-topic">
             <span>{activeConversation?.topic || 'Chat'}</span>
-            {(activeConversation?.helper_session_id === 'sukhi_ai_helper' || activeConversation?.is_ai) && (
-              <span style={{ fontSize: '0.65rem', backgroundColor: 'var(--btn-accent-bg)', color: '#fff', padding: '1px 6px', borderRadius: '8px' }}>
-                AI Companion
-              </span>
-            )}
           </div>
-          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+          <div className="chat-sub">
             {(activeConversation?.helper_session_id === 'sukhi_ai_helper' || activeConversation?.is_ai)
               ? 'Sukhi (Mindful AI Peer)'
               : 'Encrypted peer session'}
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '6px' }}>
-          <button onClick={handleEscalate} className="btn btn-danger" style={{ padding: '4px 8px', fontSize: '0.75rem' }}>
+        <div className="chat-topbar-actions">
+          <button onClick={handleEscalate} className="btn btn-danger">
             Escalate
           </button>
-          <button onClick={() => setShowReportModal(true)} className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '0.75rem' }}>
+          <button onClick={() => setShowReportModal(true)} className="btn btn-secondary">
             Report
           </button>
-          <button onClick={handleEnd} className="btn btn-outline" style={{ padding: '4px 8px', fontSize: '0.75rem' }}>
+          <button onClick={handleEnd} className="btn btn-outline">
             End
           </button>
         </div>
@@ -261,7 +266,13 @@ export default function ChatRoom() {
       )}
 
       {/* Message Stream */}
-      <div className="chat-messages">
+      <div
+        className="chat-messages"
+        ref={messagesRef}
+        onScroll={() => {
+          if (messagesRef.current) setTopbarCompact(messagesRef.current.scrollTop > 24);
+        }}
+      >
         {messages.map((m) => {
           const isMe = m.sender_session_id === session?.session_id;
           return (
@@ -286,6 +297,13 @@ export default function ChatRoom() {
         )}
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Banned notice */}
+      {isBanned && (
+        <div style={{ padding: '10px 14px', backgroundColor: '#7f1d1d', color: '#fca5a5', fontSize: '0.82rem', textAlign: 'center', borderTop: '1px solid #991b1b' }}>
+          Your access has been restricted by a moderator. You can no longer send messages.
+        </div>
+      )}
 
       {/* Input or Ended Notice */}
       {conversationEnded ? (

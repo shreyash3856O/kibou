@@ -4,11 +4,12 @@ import { api } from '../services/api';
 import { getSocket } from '../services/socket';
 
 export default function HelperDashboard() {
-  const { 
-    helperSession, 
-    initHelperSession, 
-    setActiveConversation, 
-    setCurrentView 
+  const {
+    helperSession,
+    initHelperSession,
+    setActiveConversation,
+    setCurrentView,
+    bannedInfo
   } = useApp();
 
   const [isOnline, setIsOnline] = useState(true);
@@ -17,10 +18,10 @@ export default function HelperDashboard() {
   const [acceptingId, setAcceptingId] = useState(null);
 
   useEffect(() => {
-    if (!helperSession) {
+    if (!helperSession && !bannedInfo) {
       initHelperSession();
     }
-  }, [helperSession]);
+  }, [helperSession, bannedInfo]);
 
   const loadQueue = async () => {
     try {

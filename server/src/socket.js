@@ -13,8 +13,30 @@ import { v4 as uuidv4 } from 'uuid';
 
 // Session to socket mapping for direct targeting
 const userSockets = new Map(); // session_id -> Set<socket_id>
+let ioRef = null;
+
+function isSessionBanned(sessionId) {
+  if (!sessionId) return false;
+  const session = findSessionById(sessionId);
+  return Boolean(session && session.is_banned);
+}
+
+// Push an instant kick to every live socket of a banned session.
+// Called from the admin report-action route so the ban takes effect immediately.
+export function notifySessionBanned(sessionId) {
+  if (!ioRef || !sessionId) return;
+  const socketIds = userSockets.get(sessionId);
+  if (!socketIds || socketIds.size === 0) return;
+  for (const socketId of socketIds) {
+    ioRef.to(socketId).emit('session_banned', {
+      session_id: sessionId,
+      message: 'Your access has been restricted by a moderator.'
+    });
+  }
+}
 
 export function setupSocketIO(io) {
+  ioRef = io;
   io.on('connection', (socket) => {
     let currentSessionId = null;
 
@@ -25,6 +47,14 @@ export function setupSocketIO(io) {
       socket.session_id = session_id;
       socket.user_role = role;
       socket.alias = alias;
+
+      if (isSessionBanned(session_id)) {
+        socket.emit('session_banned', {
+          session_id,
+          message: 'Your access has been restricted by a moderator.'
+        });
+        return;
+      }
 
       if (!userSockets.has(session_id)) {
         userSockets.set(session_id, new Set());
@@ -49,6 +79,13 @@ export function setupSocketIO(io) {
     // Join conversation room
     socket.on('join_conversation', ({ conversation_id, session_id, alias }) => {
       if (!conversation_id) return;
+      if (isSessionBanned(session_id || socket.session_id)) {
+        socket.emit('session_banned', {
+          session_id: session_id || socket.session_id,
+          message: 'Your access has been restricted by a moderator.'
+        });
+        return;
+      }
       const room = `conv-${conversation_id}`;
       socket.join(room);
 
@@ -120,6 +157,15 @@ export function setupSocketIO(io) {
       try {
         const { conversation_id, sender_session_id, sender_alias, sender_role, content } = data;
         if (!content || !content.trim()) return;
+
+        if (isSessionBanned(sender_session_id)) {
+          if (callback) callback({ error: 'Session banned', is_banned: true });
+          socket.emit('session_banned', {
+            session_id: sender_session_id,
+            message: 'Your access has been restricted by a moderator.'
+          });
+          return;
+        }
 
         const conv = findConversationById(conversation_id);
         if (!conv) {
@@ -255,6 +301,7 @@ export function setupSocketIO(io) {
 
     // Typing indicators
     socket.on('typing_start', ({ conversation_id, sender_alias, sender_role }) => {
+      if (isSessionBanned(socket.session_id)) return;
       socket.to(`conv-${conversation_id}`).emit('user_typing', {
         isTyping: true,
         sender_alias,

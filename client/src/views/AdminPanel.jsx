@@ -162,9 +162,12 @@ export default function AdminPanel() {
       : conv?.seeker_session_id;
 
     try {
-      await api.actionAdminReport(selectedReport.report.report_id, action, actionNotes, targetSessionId);
+      const res = await api.actionAdminReport(selectedReport.report.report_id, action, actionNotes, targetSessionId);
       setSelectedReport(null);
       loadData();
+      if (action === 'ban_user') {
+        alert(res?.banned_session_id ? `User banned and kicked from live chat.\nSession: ${res.banned_session_id}` : 'Report action saved, but no target session was found to ban.');
+      }
     } catch (err) {
       alert('Action error: ' + err.message);
     }
