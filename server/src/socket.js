@@ -9,6 +9,7 @@ import {
   saveDatabase
 } from './db.js';
 import { getSukhiResponse, SUKHI_SESSION_ID, SUKHI_ALIAS } from './sukhi.js';
+import { sendSeekerPush } from './push.js';
 import { v4 as uuidv4 } from 'uuid';
 
 // Session to socket mapping for direct targeting
@@ -125,6 +126,8 @@ export function setupSocketIO(io) {
         created_at: new Date().toISOString()
       });
       io.emit('queue_updated');
+      // Background push to subscribed helpers (works even with browser closed)
+      sendSeekerPush({ seeker_alias, topic, conversation_id }).catch(() => {});
     });
 
     // Helper accepts seeker match

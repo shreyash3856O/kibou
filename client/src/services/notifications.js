@@ -56,6 +56,61 @@ export function fireOsNotification(title, body, tag) {
   } catch (e) {}
 }
 
+// ---- Web Push subscription (background alerts, browser closed) ----
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = window.atob(base64);
+  const output = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i += 1) output[i] = raw.charCodeAt(i);
+  return output;
+}
+
+export async function getPushSubscription() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return null;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    return await reg.pushManager.getSubscription();
+  } catch (e) {
+    return null;
+  }
+}
+
+// Subscribe this browser for background push. Returns the subscription or null
+// (null = unsupported here; in-app toasts still work).
+export async function subscribeBackgroundPush(vapidPublicKey) {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return null;
+  if (!vapidPublicKey) return null;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey)
+      });
+    }
+    return sub;
+  } catch (e) {
+    return null;
+  }
+}
+
+export async function unsubscribeBackgroundPush() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return null;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if (!sub) return null;
+    const endpoint = sub.endpoint;
+    await sub.unsubscribe();
+    return endpoint;
+  } catch (e) {
+    return null;
+  }
+}
+
 // ---- In-app toast bus (works even when OS permission is denied) ----
 const toastListeners = new Set();
 let toastSeq = 0;

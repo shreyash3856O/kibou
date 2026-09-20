@@ -26,6 +26,7 @@ import {
 } from './db.js';
 import { getSukhiResponse, setGroqApiKey, getAiStatus, SUKHI_SESSION_ID, SUKHI_ALIAS } from './sukhi.js';
 import { notifySessionBanned } from './socket.js';
+import { getVapidPublicKey, savePushSubscription, removePushSubscription } from './push.js';
 
 const router = express.Router();
 
@@ -578,6 +579,39 @@ router.post('/report', (req, res) => {
     res.json({ success: true, report });
   } catch (err) {
     res.status(500).json({ error: 'Report failed: ' + err.message });
+  }
+});
+
+// ==========================================
+// 4b. WEB PUSH (background notifications, browser closed)
+// ==========================================
+
+// Public key for PushManager.subscribe() — safe to expose
+router.get('/push/vapid-key', (req, res) => {
+  res.json({ success: true, publicKey: getVapidPublicKey() });
+});
+
+// Helpers register their browser here when enabling notifications
+router.post('/push/subscribe', (req, res) => {
+  try {
+    const { subscription, role, session_id, alias } = req.body;
+    if (!subscription?.endpoint) {
+      return res.status(400).json({ error: 'Push subscription required' });
+    }
+    savePushSubscription(subscription, { role, session_id, alias });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Subscribe failed: ' + err.message });
+  }
+});
+
+router.post('/push/unsubscribe', (req, res) => {
+  try {
+    const { endpoint } = req.body;
+    const removed = removePushSubscription(endpoint);
+    res.json({ success: true, removed });
+  } catch (err) {
+    res.status(500).json({ error: 'Unsubscribe failed: ' + err.message });
   }
 });
 

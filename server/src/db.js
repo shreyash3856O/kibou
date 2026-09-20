@@ -25,6 +25,7 @@ let db = {
   admin_chat_messages: [],
   admin_users: [],
   banned_ips: [],
+  push_subscriptions: [],
   audit_logs: [],
   hotlines: [
     {

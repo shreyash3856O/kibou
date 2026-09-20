@@ -141,6 +141,15 @@ export const api = {
   unbanIp: (ip) =>
     adminRequest('/admin/unban-ip', { method: 'POST', body: JSON.stringify({ ip }) }),
 
+  getVapidKey: () => request('/push/vapid-key'),
+  subscribePush: (subscription, role, session_id, alias) =>
+    request('/push/subscribe', {
+      method: 'POST',
+      body: JSON.stringify({ subscription, role, session_id, alias })
+    }),
+  unsubscribePush: (endpoint) =>
+    request('/push/unsubscribe', { method: 'POST', body: JSON.stringify({ endpoint }) }),
+
   banUser: (sessionId, reason) =>
     adminRequest(`/admin/users/${sessionId}/ban`, { method: 'POST', body: JSON.stringify({ reason }) }),
   unbanUser: (sessionId) =>

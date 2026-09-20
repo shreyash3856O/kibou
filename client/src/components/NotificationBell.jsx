@@ -1,20 +1,46 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { ensureNotificationPermission, isNotificationSupported } from '../services/notifications';
+import { api } from '../services/api';
+import {
+  ensureNotificationPermission,
+  isNotificationSupported,
+  subscribeBackgroundPush,
+  unsubscribeBackgroundPush
+} from '../services/notifications';
 
 export default function NotificationBell() {
-  const { notifsEnabled, setNotifsEnabled } = useApp();
+  const { notifsEnabled, setNotifsEnabled, helperSession, seekerSession } = useApp();
   const [busy, setBusy] = useState(false);
 
   const handleToggle = async () => {
     if (busy) return;
+    setBusy(true);
     if (notifsEnabled) {
+      // Turn off: drop the background push subscription, keep it server-clean
+      try {
+        const endpoint = await unsubscribeBackgroundPush();
+        if (endpoint) await api.unsubscribePush(endpoint).catch(() => {});
+      } catch (e) {}
       setNotifsEnabled(false);
+      setBusy(false);
       return;
     }
-    setBusy(true);
-    // User gesture: request OS-notification permission. Toasts work regardless.
+    // Turn on: OS permission first (user gesture), then background push signup.
+    // Toasts work regardless — push is a bonus for closed-browser alerts.
     await ensureNotificationPermission();
+    try {
+      const keyRes = await api.getVapidKey().catch(() => ({}));
+      if (keyRes?.publicKey) {
+        const sub = await subscribeBackgroundPush(keyRes.publicKey);
+        if (sub) {
+          const role = helperSession ? 'helper' : 'seeker';
+          const sess = helperSession || seekerSession;
+          await api
+            .subscribePush(sub.toJSON(), role, sess?.session_id, sess?.alias)
+            .catch(() => {});
+        }
+      }
+    } catch (e) {}
     setNotifsEnabled(true);
     setBusy(false);
   };
@@ -29,9 +55,9 @@ export default function NotificationBell() {
       aria-label={notifsEnabled ? 'Disable notifications' : 'Enable notifications'}
       title={
         notifsEnabled
-          ? 'Notifications ON — new help requests & chat messages'
+          ? 'Notifications ON — help requests & chat, even with browser closed'
           : supported
-            ? 'Notifications OFF — turn on for help requests & chat messages'
+            ? 'Notifications OFF — turn on for help requests & chat, even with browser closed'
             : 'Notifications OFF — this browser blocks OS alerts, in-app toasts still work'
       }
       style={{ position: 'relative', opacity: busy ? 0.6 : 1 }}
