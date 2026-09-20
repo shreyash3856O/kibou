@@ -10,6 +10,12 @@ export default function Header() {
         onClick={() => { if (!adminUser) setCurrentView('main'); }}
         style={{ cursor: adminUser ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
       >
+        <img
+          src="/kibou-logo.png"
+          alt="Kibou logo"
+          style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover' }}
+          onError={(e) => { e.currentTarget.style.display = 'none'; }}
+        />
         <span className="brand-title">Kibou</span>
       </div>
 

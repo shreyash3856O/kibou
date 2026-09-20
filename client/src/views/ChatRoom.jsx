@@ -1,16 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { ThinkingOrb } from 'thinking-orbs';
 import { useApp } from '../context/AppContext';
 import { api } from '../services/api';
 import { getSocket } from '../services/socket';
 
 export default function ChatRoom() {
-  const { 
-    activeConversation, 
-    seekerSession, 
-    helperSession, 
+  const {
+    activeConversation,
+    seekerSession,
+    helperSession,
     setCurrentView,
-    setShowHotlinesModal 
+    setShowHotlinesModal,
+    theme
   } = useApp();
+
+  const isDark = theme !== 'light';
 
   const session = seekerSession?.session_id === activeConversation?.seeker_session_id 
     ? seekerSession 
@@ -21,6 +25,7 @@ export default function ChatRoom() {
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [isPeerTyping, setIsPeerTyping] = useState(false);
+  const [isLocalTyping, setIsLocalTyping] = useState(false);
   const [isCrisisActive, setIsCrisisActive] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportReason, setReportReason] = useState('unsafe_behavior');
@@ -29,6 +34,7 @@ export default function ChatRoom() {
 
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+  const localTypingTimeoutRef = useRef(null);
 
   useEffect(() => {
     if (!activeConversation) {
@@ -86,6 +92,7 @@ export default function ChatRoom() {
     });
 
     return () => {
+      if (localTypingTimeoutRef.current) clearTimeout(localTypingTimeoutRef.current);
       socket.emit('leave_conversation', {
         conversation_id: convId,
         session_id: session?.session_id,
@@ -109,6 +116,8 @@ export default function ChatRoom() {
 
     const content = inputText.trim();
     setInputText('');
+    setIsLocalTyping(false);
+    if (localTypingTimeoutRef.current) clearTimeout(localTypingTimeoutRef.current);
 
     const socket = getSocket();
     socket.emit('typing_stop', { conversation_id: activeConversation.conversation_id });
@@ -124,6 +133,9 @@ export default function ChatRoom() {
 
   const handleInputChange = (e) => {
     setInputText(e.target.value);
+    setIsLocalTyping(true);
+    if (localTypingTimeoutRef.current) clearTimeout(localTypingTimeoutRef.current);
+    localTypingTimeoutRef.current = setTimeout(() => setIsLocalTyping(false), 1200);
     const socket = getSocket();
     socket.emit('typing_start', {
       conversation_id: activeConversation?.conversation_id,
@@ -264,6 +276,11 @@ export default function ChatRoom() {
 
         {isPeerTyping && (
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <ThinkingOrb
+              state={(activeConversation?.helper_session_id === 'sukhi_ai_helper' || activeConversation?.is_ai) ? 'listening' : 'composing'}
+              size={20}
+              dark={isDark}
+            />
             <span>{(activeConversation?.helper_session_id === 'sukhi_ai_helper' || activeConversation?.is_ai) ? 'Sukhi is reflecting...' : 'Peer is typing...'}</span>
           </div>
         )}
@@ -282,6 +299,11 @@ export default function ChatRoom() {
         </div>
       ) : (
         <form onSubmit={handleSendMessage} className="chat-input-bar">
+          {isLocalTyping && (
+            <span style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }} title="You are typing...">
+              <ThinkingOrb state="composing" size={20} dark={isDark} />
+            </span>
+          )}
           <input
             type="text"
             placeholder="Type a message..."
