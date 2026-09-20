@@ -603,6 +603,19 @@ router.get('/push/vapid-key', (req, res) => {
   res.json({ success: true, publicKey: getVapidPublicKey() });
 });
 
+// Diagnostics: is background push configured, and how many helpers listen?
+// (No endpoints or keys exposed — safe to query from production.)
+router.get('/push/status', (req, res) => {
+  const db = getDb();
+  const subs = db.push_subscriptions || [];
+  res.json({
+    success: true,
+    configured: Boolean(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY),
+    helperSubscribers: subs.filter((s) => s.role === 'helper').length,
+    totalSubscribers: subs.length
+  });
+});
+
 // Helpers register their browser here when enabling notifications
 router.post('/push/subscribe', (req, res) => {
   try {

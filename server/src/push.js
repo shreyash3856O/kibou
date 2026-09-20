@@ -99,10 +99,15 @@ export async function sendChatPush({ conversation, sender_session_id, sender_ali
       } catch (e) {
         if (e?.statusCode === 404 || e?.statusCode === 410) {
           removePushSubscription(record.subscription.endpoint);
+        } else {
+          console.warn('[Push] chat send failed:', e?.message || e);
         }
       }
     })
   );
+  if (subs.length > 0) {
+    console.log(`[Push] chat alert: ${sent}/${subs.length} delivered (conv ${conversation.conversation_id})`);
+  }
   return { sent };
 }
 
@@ -139,5 +144,6 @@ export async function sendSeekerPush({ seeker_alias, topic, conversation_id }) {
       }
     })
   );
+  console.log(`[Push] seeker alert: ${sent}/${subs.length} delivered (${seeker_alias || 'seeker'}${topic ? ` — ${topic}` : ''})`);
   return { sent };
 }

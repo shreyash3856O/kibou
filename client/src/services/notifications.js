@@ -67,10 +67,18 @@ function urlBase64ToUint8Array(base64String) {
   return output;
 }
 
+// serviceWorker.ready never resolves if registration failed — cap the wait
+function readyWithTimeout(ms = 8000) {
+  return Promise.race([
+    navigator.serviceWorker.ready,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('sw-timeout')), ms))
+  ]);
+}
+
 export async function getPushSubscription() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return null;
   try {
-    const reg = await navigator.serviceWorker.ready;
+    const reg = await readyWithTimeout();
     return await reg.pushManager.getSubscription();
   } catch (e) {
     return null;
@@ -83,7 +91,7 @@ export async function subscribeBackgroundPush(vapidPublicKey) {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return null;
   if (!vapidPublicKey) return null;
   try {
-    const reg = await navigator.serviceWorker.ready;
+    const reg = await readyWithTimeout();
     let sub = await reg.pushManager.getSubscription();
     if (!sub) {
       sub = await reg.pushManager.subscribe({
@@ -100,7 +108,7 @@ export async function subscribeBackgroundPush(vapidPublicKey) {
 export async function unsubscribeBackgroundPush() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return null;
   try {
-    const reg = await navigator.serviceWorker.ready;
+    const reg = await readyWithTimeout();
     const sub = await reg.pushManager.getSubscription();
     if (!sub) return null;
     const endpoint = sub.endpoint;

@@ -5,7 +5,9 @@ import {
   getStoredNotifEnabled,
   setStoredNotifEnabled,
   fireOsNotification,
-  pushToast
+  pushToast,
+  getPushSubscription,
+  subscribeBackgroundPush
 } from '../services/notifications';
 
 const AppContext = createContext();
@@ -192,6 +194,28 @@ export function AppProvider({ children }) {
       socket.off('session_banned', handleSessionBanned);
     };
   }, [seekerSession, helperSession, activeTab, adminUser]);
+
+  // Self-heal background push: browsers can drop subscriptions and server
+  // restarts can wipe the subscriber list — if the bell is ON but no active
+  // browser subscription exists, silently re-subscribe and re-register.
+  useEffect(() => {
+    if (!notifsEnabled || !helperSession || adminUser || bannedInfo) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const existing = await getPushSubscription();
+        if (existing || cancelled) return;
+        const keyRes = await api.getVapidKey().catch(() => ({}));
+        if (!keyRes?.publicKey || cancelled) return;
+        const sub = await subscribeBackgroundPush(keyRes.publicKey);
+        if (!sub || cancelled) return;
+        await api
+          .subscribePush(sub.toJSON(), 'helper', helperSession.session_id, helperSession.alias)
+          .catch(() => {});
+      } catch (e) {}
+    })();
+    return () => { cancelled = true; };
+  }, [notifsEnabled, helperSession?.session_id, adminUser, bannedInfo]);
 
   // Global real-notification dispatcher: help requests + chat messages.
   // Subscribed once; reads live state through viewRef (no stale closures).
