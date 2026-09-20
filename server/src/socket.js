@@ -5,11 +5,12 @@ import {
   addMessage,
   getMessagesByConversationId,
   findSessionById,
+  isSessionIdBanned,
   getDb,
   saveDatabase
 } from './db.js';
 import { getSukhiResponse, SUKHI_SESSION_ID, SUKHI_ALIAS } from './sukhi.js';
-import { sendSeekerPush } from './push.js';
+import { sendSeekerPush, sendChatPush } from './push.js';
 import { v4 as uuidv4 } from 'uuid';
 
 // Session to socket mapping for direct targeting
@@ -17,9 +18,7 @@ const userSockets = new Map(); // session_id -> Set<socket_id>
 let ioRef = null;
 
 function isSessionBanned(sessionId) {
-  if (!sessionId) return false;
-  const session = findSessionById(sessionId);
-  return Boolean(session && session.is_banned);
+  return isSessionIdBanned(sessionId);
 }
 
 // Push an instant kick to every live socket of a banned session.
@@ -203,6 +202,9 @@ export function setupSocketIO(io) {
         const room = `conv-${conversation_id}`;
         io.to(room).emit('new_message', payload);
 
+        // Background push to the other participant (works even with browser closed)
+        sendChatPush({ conversation: conv, sender_session_id, sender_alias, content }).catch(() => {});
+
         // If crisis detected, broadcast safety hotlines & flag counselor channel
         if (crisisCheck.isCrisis) {
           conv.is_crisis_flagged = true;
@@ -290,6 +292,14 @@ export function setupSocketIO(io) {
                 created_at: sukhiMsg.created_at,
                 is_crisis_keyword_detected: sukhiReply.isCrisis
               });
+
+              // Background push to the seeker (works even with browser closed)
+              sendChatPush({
+                conversation: conv,
+                sender_session_id: SUKHI_SESSION_ID,
+                sender_alias: SUKHI_ALIAS,
+                content: sukhiReply.content
+              }).catch(() => {});
             } catch (e) {
               console.error('Sukhi AI response error:', e);
               io.to(room).emit('user_typing', { isTyping: false });

@@ -63,6 +63,49 @@ export function removePushSubscription(endpoint) {
   return false;
 }
 
+// Notify the OTHER participant of a conversation about a new chat message.
+// Recipient is resolved from the conversation (works for peer chats and Sukhi
+// replies alike). Sukhi itself never has a subscription, so it is skipped.
+export async function sendChatPush({ conversation, sender_session_id, sender_alias, content }) {
+  if (!ensurePushConfigured()) return { sent: 0 };
+  if (!conversation || !sender_session_id || !content?.trim()) return { sent: 0 };
+
+  let recipientId = null;
+  if (conversation.seeker_session_id === sender_session_id) {
+    recipientId = conversation.helper_session_id;
+  } else {
+    recipientId = conversation.seeker_session_id;
+  }
+  if (!recipientId || recipientId === 'sukhi_ai_helper') return { sent: 0 };
+
+  const subs = getSubscriptions().filter((s) => s.subscription?.endpoint && s.session_id === recipientId);
+  if (subs.length === 0) return { sent: 0, reason: 'recipient_not_subscribed' };
+
+  const snippet = content.trim();
+  const payload = JSON.stringify({
+    title: `New message from ${sender_alias || 'Peer'}`,
+    body: snippet.length > 120 ? `${snippet.slice(0, 120)}...` : snippet,
+    tag: `kibou-chat-${conversation.conversation_id}`,
+    url: '/',
+    conversation_id: conversation.conversation_id
+  });
+
+  let sent = 0;
+  await Promise.all(
+    subs.map(async (record) => {
+      try {
+        await webpush.sendNotification(record.subscription, payload);
+        sent += 1;
+      } catch (e) {
+        if (e?.statusCode === 404 || e?.statusCode === 410) {
+          removePushSubscription(record.subscription.endpoint);
+        }
+      }
+    })
+  );
+  return { sent };
+}
+
 // Notify all subscribed helpers that a seeker is waiting.
 // Fire-and-forget: never blocks the socket handler. Dead endpoints are pruned.
 export async function sendSeekerPush({ seeker_alias, topic, conversation_id }) {

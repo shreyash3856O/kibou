@@ -37,6 +37,7 @@ export default function ChatRoom() {
   const messagesEndRef = useRef(null);
   const messagesRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+  const convMetaRef = useRef({ convId: null, session: null });
   const localTypingTimeoutRef = useRef(null);
 
   useEffect(() => {
@@ -47,6 +48,7 @@ export default function ChatRoom() {
 
     const convId = activeConversation.conversation_id;
     setTopbarCompact(false);
+    convMetaRef.current = { convId, session };
 
     api.getConversationMessages(convId)
       .then((res) => {
@@ -126,6 +128,39 @@ export default function ChatRoom() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isPeerTyping]);
+
+  // Catch up on anything missed while the tab was hidden or socket dropped:
+  // rejoin the room and reload messages on foreground / focus / reconnect.
+  useEffect(() => {
+    const socket = getSocket();
+    const refresh = () => {
+      const { convId, session: s } = convMetaRef.current;
+      if (!convId) return;
+      socket.emit('join_conversation', {
+        conversation_id: convId,
+        session_id: s?.session_id,
+        alias: s?.alias
+      });
+      api.getConversationMessages(convId)
+        .then((res) => {
+          setMessages(res.messages || []);
+          if (res.conversation?.is_crisis_flagged) setIsCrisisActive(true);
+          if (res.conversation?.status === 'ended') setConversationEnded(true);
+        })
+        .catch(() => {});
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') refresh();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('focus', refresh);
+    socket.on('connect', refresh);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('focus', refresh);
+      socket.off('connect', refresh);
+    };
+  }, []);
 
   const handleSendMessage = (e) => {
     e.preventDefault();

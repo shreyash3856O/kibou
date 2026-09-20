@@ -16,6 +16,9 @@ import {
   findSessionById,
   findOrRecoverSession,
   saveSession,
+  isSessionIdBanned,
+  banSessionById,
+  unbanSessionById,
   findConversationById,
   saveConversation,
   addMessage,
@@ -94,6 +97,11 @@ router.get('/auth/me', async (req, res) => {
     const db = getDb();
     const admin = db.admin_users?.find((u) => u.admin_id === decoded.admin_id);
     return res.json({ success: true, role: 'admin', user: admin });
+  }
+
+  // Registry first: a banned id stays banned even if its session object is gone
+  if (isSessionIdBanned(decoded.session_id)) {
+    return res.status(403).json({ error: 'Session banned', is_banned: true });
   }
 
   let session = findSessionById(decoded.session_id);
@@ -259,6 +267,10 @@ router.post('/conversations/start', async (req, res) => {
   try {
     const { seeker_session_id, seeker_alias, topic, initial_prompt, helper_session_id } = req.body;
 
+    if (isSessionIdBanned(seeker_session_id)) {
+      return res.status(403).json({ error: 'Account restricted', is_banned: true });
+    }
+
     let seeker = findSessionById(seeker_session_id);
     if (!seeker && seeker_session_id) {
       seeker = await findOrRecoverSession(seeker_session_id, 'seeker', seeker_alias || 'Anonymous Seeker');
@@ -275,7 +287,7 @@ router.post('/conversations/start', async (req, res) => {
 
     if (helper_session_id) {
       helper = findSessionById(helper_session_id);
-      if (helper && helper.is_available && !helper.is_banned) {
+      if (helper && helper.is_available && !helper.is_banned && !isSessionIdBanned(helper_session_id)) {
         status = 'active';
       }
     }
@@ -738,13 +750,9 @@ router.post('/admin/reports/:id/action', requireAdmin, (req, res) => {
 
     if (action === 'ban_user') {
       if (target_session_id) {
-        const session = findSessionById(target_session_id);
-        if (session) {
-          session.is_banned = true;
-          saveSession(session);
-          // Kick the banned user out of any live chat immediately
-          notifySessionBanned(target_session_id);
-        }
+        banSessionById(target_session_id);
+        // Kick the banned user out of any live chat immediately
+        notifySessionBanned(target_session_id);
       }
       addAuditLog(req.admin.admin_id, 'BAN_USER', target_session_id || '', `Banned via report ${report.report_id}`);
     }
@@ -766,7 +774,8 @@ router.get('/admin/users', requireAdmin, (req, res) => {
   res.json({
     success: true,
     sessions: db.sessions || [],
-    banned_ips: db.banned_ips || []
+    banned_ips: db.banned_ips || [],
+    banned_session_ids: db.banned_session_ids || []
   });
 });
 
@@ -798,26 +807,18 @@ router.post('/admin/unban-ip', requireAdmin, (req, res) => {
 });
 
 router.post('/admin/users/:sessionId/ban', requireAdmin, (req, res) => {
-  const session = findSessionById(req.params.sessionId);
-  if (!session) return res.status(404).json({ error: 'Session not found' });
+  const session = banSessionById(req.params.sessionId);
+  notifySessionBanned(req.params.sessionId);
+  addAuditLog(req.admin.admin_id, 'BAN_SESSION', req.params.sessionId, 'Manual session ban');
 
-  session.is_banned = true;
-  saveSession(session);
-  notifySessionBanned(session.session_id);
-  addAuditLog(req.admin.admin_id, 'BAN_SESSION', session.session_id, 'Manual session ban');
-
-  res.json({ success: true, session });
+  res.json({ success: true, session: session || { session_id: req.params.sessionId, is_banned: true } });
 });
 
 router.post('/admin/users/:sessionId/unban', requireAdmin, (req, res) => {
-  const session = findSessionById(req.params.sessionId);
-  if (!session) return res.status(404).json({ error: 'Session not found' });
+  const session = unbanSessionById(req.params.sessionId);
+  addAuditLog(req.admin.admin_id, 'UNBAN_SESSION', req.params.sessionId, 'Manual session unban');
 
-  session.is_banned = false;
-  saveSession(session);
-  addAuditLog(req.admin.admin_id, 'UNBAN_SESSION', session.session_id, 'Manual session unban');
-
-  res.json({ success: true, session });
+  res.json({ success: true, session: session || { session_id: req.params.sessionId, is_banned: false } });
 });
 
 router.get('/admin/audit-logs', requireAdmin, (req, res) => {

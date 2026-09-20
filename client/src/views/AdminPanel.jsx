@@ -163,7 +163,22 @@ export default function AdminPanel() {
 
     try {
       const res = await api.actionAdminReport(selectedReport.report.report_id, action, actionNotes, targetSessionId);
+      const actedId = selectedReport.report.report_id;
       setSelectedReport(null);
+      // Reflect instantly — don't wait for the 5s poll
+      setReports((prev) => prev.map((r) =>
+        r.report_id === actedId
+          ? { ...r, status: action === 'dismiss' ? 'dismissed' : 'action_taken', action_taken: action }
+          : r
+      ));
+      if (action === 'ban_user' && targetSessionId) {
+        setUsersData((prev) => ({
+          ...prev,
+          sessions: (prev.sessions || []).map((s) =>
+            s.session_id === targetSessionId ? { ...s, is_banned: true } : s
+          )
+        }));
+      }
       loadData();
       if (action === 'ban_user') {
         alert(res?.banned_session_id ? `User banned and kicked from live chat.\nSession: ${res.banned_session_id}` : 'Report action saved, but no target session was found to ban.');
@@ -177,8 +192,12 @@ export default function AdminPanel() {
     e.preventDefault();
     if (!manualIpToBan.trim()) return;
     try {
-      await api.banIp(manualIpToBan.trim(), 'Manual admin ban');
+      const res = await api.banIp(manualIpToBan.trim(), 'Manual admin ban');
       setManualIpToBan('');
+      // Reflect instantly from the server's fresh list
+      if (res?.banned_ips) {
+        setUsersData((prev) => ({ ...prev, banned_ips: res.banned_ips }));
+      }
       loadData();
     } catch (err) {
       alert(err.message);
@@ -215,7 +234,11 @@ export default function AdminPanel() {
 
   const handleUnbanIp = async (ip) => {
     try {
-      await api.unbanIp(ip);
+      const res = await api.unbanIp(ip);
+      // Reflect instantly from the server's fresh list
+      if (res?.banned_ips) {
+        setUsersData((prev) => ({ ...prev, banned_ips: res.banned_ips }));
+      }
       loadData();
     } catch (err) {
       alert(err.message);
@@ -224,10 +247,17 @@ export default function AdminPanel() {
 
   const handleToggleSessionBan = async (s) => {
     try {
-      if (s.is_banned) {
-        await api.unbanUser(s.session_id);
-      } else {
-        await api.banUser(s.session_id);
+      const res = s.is_banned
+        ? await api.unbanUser(s.session_id)
+        : await api.banUser(s.session_id);
+      // Reflect instantly from the server's session state
+      if (res?.session) {
+        setUsersData((prev) => ({
+          ...prev,
+          sessions: (prev.sessions || []).map((x) =>
+            x.session_id === res.session.session_id ? { ...x, is_banned: res.session.is_banned } : x
+          )
+        }));
       }
       loadData();
     } catch (err) {

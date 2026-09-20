@@ -25,6 +25,7 @@ let db = {
   admin_chat_messages: [],
   admin_users: [],
   banned_ips: [],
+  banned_session_ids: [],
   push_subscriptions: [],
   audit_logs: [],
   hotlines: [
@@ -303,6 +304,8 @@ export async function initializeDatabase() {
   saveSession(sukhiSession);
 
   if (!db.banned_ips) db.banned_ips = [];
+  if (!db.banned_session_ids) db.banned_session_ids = [];
+  if (!db.push_subscriptions) db.push_subscriptions = [];
 }
 
 function loadLocalJson() {
@@ -354,10 +357,51 @@ export const findSessionById = (id) => {
   return db.sessions.find((s) => s.session_id === id);
 };
 
+// Persistent ban registry — survives restarts via the JSON file.
+// A banned session id stays banned even if its session object is gone.
+export const isSessionIdBanned = (id) => {
+  if (!id) return false;
+  if (db.banned_session_ids?.includes(id)) return true;
+  const s = db.sessions.find((x) => x.session_id === id);
+  return Boolean(s && s.is_banned);
+};
+
+export const banSessionById = (id) => {
+  if (!id) return null;
+  if (!db.banned_session_ids) db.banned_session_ids = [];
+  if (!db.banned_session_ids.includes(id)) db.banned_session_ids.push(id);
+  const session = db.sessions.find((x) => x.session_id === id);
+  if (session) {
+    session.is_banned = true;
+    saveSession(session);
+  } else {
+    saveDatabase();
+  }
+  return session || null;
+};
+
+export const unbanSessionById = (id) => {
+  if (!id) return null;
+  if (db.banned_session_ids) {
+    db.banned_session_ids = db.banned_session_ids.filter((x) => x !== id);
+  }
+  const session = db.sessions.find((x) => x.session_id === id);
+  if (session) {
+    session.is_banned = false;
+    saveSession(session);
+  } else {
+    saveDatabase();
+  }
+  return session || null;
+};
+
 export const findOrRecoverSession = async (session_id, fallbackRole = 'seeker', fallbackAlias = 'Anonymous') => {
   if (!session_id) return null;
   let session = db.sessions.find((s) => s.session_id === session_id);
   if (session) return session;
+
+  // Never resurrect a banned session — a refresh must not unban anyone
+  if (isSessionIdBanned(session_id)) return null;
 
   if (isMongoConnected && Models.Session) {
     try {
