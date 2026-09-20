@@ -1,5 +1,6 @@
 import React from 'react';
 import { useApp } from '../context/AppContext';
+import NotificationBell from './NotificationBell';
 
 export default function Header() {
   const { activeTab, setActiveTab, currentView, setCurrentView, setShowDrawer, adminUser } = useApp();
@@ -52,6 +53,9 @@ export default function Header() {
         <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Admin Mode</span>
       )}
 
+      <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+        <NotificationBell />
+
       {/* Three-bar hamburger */}
       <button
         onClick={() => setShowDrawer(true)}
@@ -64,6 +68,7 @@ export default function Header() {
           <line x1="3" y1="18" x2="21" y2="18"></line>
         </svg>
       </button>
+      </div>
     </header>
   );
 }

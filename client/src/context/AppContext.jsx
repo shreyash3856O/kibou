@@ -1,6 +1,12 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { api } from '../services/api';
 import { getSocket } from '../services/socket';
+import {
+  getStoredNotifEnabled,
+  setStoredNotifEnabled,
+  fireOsNotification,
+  pushToast
+} from '../services/notifications';
 
 const AppContext = createContext();
 
@@ -23,6 +29,17 @@ export function AppProvider({ children }) {
 
   // Set when the server rejects a session as banned — blocks all app access
   const [bannedInfo, setBannedInfo] = useState(null);
+
+  // Notification toggle (persisted). Controls help-request + chat-message alerts.
+  const [notifsEnabled, setNotifsEnabledState] = useState(() => getStoredNotifEnabled());
+  const setNotifsEnabled = (enabled) => {
+    setStoredNotifEnabled(enabled);
+    setNotifsEnabledState(enabled);
+  };
+
+  // Fresh refs so socket handlers always see current view/session without re-subscribing
+  const viewRef = useRef(null);
+  viewRef.current = { currentView, activeTab, activeConversation, seekerSession, helperSession, notifsEnabled, adminUser };
 
   const clearStoredSession = (role) => {
     localStorage.removeItem(`${role}_session`);
@@ -176,6 +193,63 @@ export function AppProvider({ children }) {
     };
   }, [seekerSession, helperSession, activeTab, adminUser]);
 
+  // Global real-notification dispatcher: help requests + chat messages.
+  // Subscribed once; reads live state through viewRef (no stale closures).
+  useEffect(() => {
+    const socket = getSocket();
+
+    // Someone is seeking help — notify users holding a helper session
+    const handleSeekerInQueue = (data) => {
+      const v = viewRef.current;
+      if (!v.notifsEnabled || !v.helperSession || v.adminUser) return;
+      const title = 'Someone needs support';
+      const body = `${data?.seeker_alias || 'A seeker'} is waiting${data?.topic ? ` — ${data.topic}` : ''}. Tap to help.`;
+      fireOsNotification(title, body, 'kibou-seeker-queue');
+      pushToast({
+        title,
+        body,
+        onClick: () => {
+          setActiveTab('helper');
+          setCurrentView('main');
+        }
+      });
+    };
+
+    // New chat message (peer or Sukhi) — skip own messages and the open chat
+    const handleChatMessage = (msg) => {
+      const v = viewRef.current;
+      if (!v.notifsEnabled || !msg) return;
+      const ownIds = [v.seekerSession?.session_id, v.helperSession?.session_id].filter(Boolean);
+      if (ownIds.includes(msg.sender_session_id)) return;
+      if (v.currentView === 'chat' && v.activeConversation?.conversation_id === msg.conversation_id) return;
+      const sender = msg.sender_alias || (msg.sender_role === 'helper' ? 'Helper' : 'Peer');
+      const snippet = (msg.content || '').trim();
+      const title = `New message from ${sender}`;
+      const body = snippet.length > 90 ? `${snippet.slice(0, 90)}...` : snippet;
+      fireOsNotification(title, body || 'You have a new message.', `kibou-chat-${msg.conversation_id}`);
+      pushToast({
+        title,
+        body: body || 'You have a new message.',
+        onClick: async () => {
+          try {
+            const res = await api.getConversationMessages(msg.conversation_id);
+            if (res?.conversation) {
+              setActiveConversation(res.conversation);
+              setCurrentView('chat');
+            }
+          } catch (e) {}
+        }
+      });
+    };
+
+    socket.on('new_seeker_in_queue', handleSeekerInQueue);
+    socket.on('new_message', handleChatMessage);
+    return () => {
+      socket.off('new_seeker_in_queue', handleSeekerInQueue);
+      socket.off('new_message', handleChatMessage);
+    };
+  }, []);
+
   const initSeekerSession = async () => {
     if (bannedInfo) return null;
     try {
@@ -243,7 +317,9 @@ export function AppProvider({ children }) {
         setShowFacultyChatModal,
         hotlines,
         bannedInfo,
-        setBannedInfo
+        setBannedInfo,
+        notifsEnabled,
+        setNotifsEnabled
       }}
     >
       {children}

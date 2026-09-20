@@ -9,6 +9,7 @@ import AdminPanel from './views/AdminPanel';
 import HotlinesModal from './components/HotlinesModal';
 import BreathingModal from './components/BreathingModal';
 import FacultyChatModal from './components/FacultyChatModal';
+import ToastStack from './components/ToastStack';
 
 export default function App() {
   const { currentView, setCurrentView, activeTab, adminUser, bannedInfo } = useApp();
@@ -63,6 +64,8 @@ export default function App() {
       </main>
 
       <DrawerMenu />
+
+      <ToastStack />
 
       <HotlinesModal />
       <BreathingModal />
