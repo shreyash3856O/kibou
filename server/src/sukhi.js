@@ -9,13 +9,12 @@ const __dirname = path.dirname(__filename);
 export const SUKHI_SESSION_ID = 'sukhi_ai_helper';
 export const SUKHI_ALIAS = 'Sukhi (AI Companion)';
 
-// Memory store for runtime API key configuration
+// Memory store for runtime API key configuration (never hardcode keys here — use server/.env)
 let runtimeGroqKey = process.env.GROQ_API_KEY || '';
 
 export function setGroqApiKey(key) {
   runtimeGroqKey = (key || '').trim();
   process.env.GROQ_API_KEY = runtimeGroqKey;
-
   try {
     const envPath = path.join(__dirname, '../.env');
     let content = '';
@@ -39,44 +38,58 @@ export function getAiStatus() {
   const activeKey = runtimeGroqKey || process.env.GROQ_API_KEY || '';
   const hasGroq = Boolean(activeKey && activeKey.startsWith('gsk_'));
   return {
-    provider: hasGroq ? 'Groq (Llama 3.3 70B)' : 'Kibou Context & Hinglish Engine',
+    provider: hasGroq ? 'Groq (qwen/qwen3.8-27b)' : 'Kibou Context & Hinglish Engine',
     groqConfigured: hasGroq,
     groqKeyMasked: hasGroq ? `${activeKey.slice(0, 7)}...${activeKey.slice(-4)}` : null,
-    model: hasGroq ? 'llama-3.3-70b-versatile' : 'kibou-nlu-hinglish-v4'
+    model: hasGroq ? 'qwen/qwen3.8-27b' : 'kibou-nlu-hinglish-v4'
   };
 }
 
-export const SUKHI_SYSTEM_PROMPT = `You are "Sukhi", an empathetic, grounded peer companion on Kibou — a student mental wellness platform in India.
+// Verified working models (confirmed against API September 2026)
+// Ordered by suitability for concise, empathetic peer conversation
+const GROQ_MODELS = [
+  'qwen/qwen3.8-27b',    // Best: concise, mature, contextual, no fluff
+  'groq/compound-mini',  // Fallback 1: fast, reliable
+  'groq/compound',       // Fallback 2: stronger reasoning
+  'openai/gpt-oss-20b',  // Fallback 3: solid general model
+];
 
-## TONE & LANGUAGE RULES (CRITICAL)
-1. DO NOT OVERUSE "yaar", "dost", or forced slang. It sounds corny, fake, and annoying. Speak like a natural, mature college peer or supportive friend in their early 20s.
-2. FLUENT HINGLISH COMPREHENSION: Understand Indian Hinglish naturally (e.g. "padhai nahi ho rahi", "fat rahi hai", "gf chahiye", "maths me fail ho jaunga", "ghar wale taane maar rahe hai", "dimag kharab ho raha hai", "pukish feel ho raha hai").
-3. DIRECT CONTEXTUAL RESPONSES:
-   - If user says they feel physical symptoms ("i feel pukish", nausea, headache), address that physical reaction first.
-   - If user names a specific subject ("i think its math"), talk specifically about math and exam anxiety.
-   - If user says "i need a gf" or talks about relationships, talk naturally like a real friend about companionship and loneliness, NOT like a therapist reading a script.
-4. ZERO REPETITION: Never repeat questions or phrases you have already said.
-5. NO EMOJIS: Do not use any emojis or asterisks for actions. Keep the text clean, readable, and authentic.
+export const SUKHI_SYSTEM_PROMPT = `You are "Sukhi", a peer companion on Kibou — a student mental wellness platform in India.
 
-## BOUNDARIES & SAFETY
-- You are a supportive peer, not a therapist.
-- For suicide/self-harm signals, provide immediately:
-  * Tele-MANAS: 14416 (Toll-free 24/7)
-  * KIRAN: 1800-599-0019 (24/7)
-  * Shreyash Chaturvedi: 7304167033`;
+CRITICAL RULES — FOLLOW EVERY SINGLE TIME WITHOUT EXCEPTION:
+
+1. LENGTH: Write 2 to 3 sentences maximum. No long paragraphs. No lists. No tables. No headers. No bullet points.
+
+2. TONE: You are a mature, grounded college friend in their early 20s — not a therapist, not a helpline, not a motivational speaker. Sound real and human.
+
+3. BANNED WORDS: Never say "yaar", "dost", "buddy", "bhai", or any forced desi slang. It sounds fake and patronizing. Do not say it even once.
+
+4. NO EMOJIS: Zero emojis. No asterisks. No markdown formatting of any kind.
+
+5. HINGLISH: Understand Hinglish naturally. When the user writes in Hinglish (e.g. "padhai nahi ho rahi", "pukish feel ho raha hai", "fat rahi hai", "dimag kharab ho raha hai"), respond in a natural Hindi-English mix that matches their register. Do not force it if they write in English.
+
+6. CONTEXT IS EVERYTHING: Read every message in the conversation history. Respond only to what the user actually said right now — do not give generic wellness scripts. If they said "math", talk about math specifically. If they said "nausea", address the physical feeling first. Never ignore their specific words.
+
+7. ONE QUESTION: End your response with exactly one specific, grounded follow-up question. Never ask two questions in one response.
+
+8. NO REPEATED PHRASES: Never repeat something you have already said in this conversation.
+
+WHAT SUKHI DOES: Listens carefully, reflects back what the person is actually going through, makes them feel understood — then asks one question to go deeper.
+
+9. SCOPE — MENTAL HEALTH ONLY: You exist purely for emotional support and mental wellness. You only respond to feelings, stress, anxiety, loneliness, relationships, family pressure, academic pressure (as feelings, never as tutoring), sleep, burnout, and student-life struggles.
+   - NEVER act as a tutor, coder, or general assistant. Do not solve homework, math problems, or equations. Do not write code, essays, assignments, emails, resumes, or letters. Do not answer general-knowledge or factual questions (capitals, history, science facts, definitions). Do not translate text.
+   - If a message has nothing to do with emotions or wellbeing, DO NOT answer it. Instead reply with one warm line saying you are only here to listen and support their feelings, then ask one caring question that steers back to how they are doing. Example: "That's outside what I'm here for — I'm just a listening ear for whatever you're feeling. What's been on your mind lately?"
+   - Study talk is in scope ONLY through feelings (stress, fear of failure, burnout) — never give study material, solutions, or exam answers.
+
+SAFETY: For any self-harm or suicide signal, respond with care and immediately share:
+Tele-MANAS: 14416 (Toll-free, 24/7)
+KIRAN: 1800-599-0019 (24/7)
+Shreyash Chaturvedi: 7304167033`;
 
 const CRISIS_KEYWORDS = [
-  'suicide',
-  'kill myself',
-  'end my life',
-  'self harm',
-  'cutting',
-  'want to die',
-  'no reason to live',
-  'better off dead',
-  'take my life',
-  'hang myself',
-  'overdose'
+  'suicide', 'kill myself', 'end my life', 'self harm', 'cutting',
+  'want to die', 'no reason to live', 'better off dead',
+  'take my life', 'hang myself', 'overdose'
 ];
 
 export function containsCrisisSignal(message) {
@@ -85,480 +98,380 @@ export function containsCrisisSignal(message) {
   return CRISIS_KEYWORDS.some((kw) => lower.includes(kw));
 }
 
-export const CRISIS_FALLBACK_RESPONSE = `I hear you, and I am glad you reached out. What you are going through is real, but you do not have to carry this heavy weight alone.
+export const CRISIS_FALLBACK_RESPONSE = `I hear you, and I am glad you reached out. What you are going through is real, but you do not have to carry this alone.
 
-Please connect with people who can support you right now:
-Tele-MANAS (Govt of India): Call 14416 (Toll-free, 24/7)
-KIRAN Helpline: Call 1800-599-0019 (Toll-free, 24/7)
+Please connect with someone who can help right now:
+Tele-MANAS (Govt of India): 14416 (Toll-free, 24/7)
+KIRAN Helpline: 1800-599-0019 (Toll-free, 24/7)
 Shreyash Chaturvedi: 7304167033
 
-Take one slow breath. Help is available 24/7.`;
+Take one slow breath. Help is a call away.`;
 
 /* =====================================================================
-   ZERO-REPETITION HISTORY INVARIANT
-   Guarantees Sukhi never sends the same or similar message twice.
+   ZERO-REPETITION INVARIANT
    ===================================================================== */
-
 function wasAlreadySaidBySukhi(candidate, history = []) {
   if (!candidate || !history.length) return false;
-  const normCandidate = candidate.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-  if (normCandidate.length < 15) return false;
+  const norm = (s) => s.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+  const nc = norm(candidate);
+  if (nc.length < 15) return false;
 
   for (const m of history) {
     if (m.sender_role === 'helper' && m.content) {
-      const normMsg = m.content.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-      if (normMsg.length < 15) continue;
-
-      const sliceLen = Math.min(50, normCandidate.length, normMsg.length);
-      if (normCandidate.slice(0, sliceLen) === normMsg.slice(0, sliceLen)) {
-        return true;
-      }
-      if (normCandidate.includes(normMsg) || normMsg.includes(normCandidate)) {
-        return true;
-      }
+      const nm = norm(m.content);
+      if (nm.length < 15) continue;
+      const sliceLen = Math.min(50, nc.length, nm.length);
+      if (nc.slice(0, sliceLen) === nm.slice(0, sliceLen)) return true;
+      if (nc.includes(nm) || nm.includes(nc)) return true;
     }
   }
   return false;
 }
 
 /* =====================================================================
-   STATEFUL CONVERSATION CONTEXT ANALYZER & HINGLISH PARSER
+   INTENT CLASSIFIER (Hinglish-aware)
    ===================================================================== */
-
 function classifyUserIntent(text) {
   const lower = (text || '').toLowerCase().trim();
 
-  // 1. Somatic / Physical Stress (pukish, nausea, headache, panic physical symptoms)
   if (lower.includes('pukish') || lower.includes('nausea') || lower.includes('vomit') ||
-      lower.includes('throw up') || lower.includes('sick to my stomach') || lower.includes('sir dard') ||
-      lower.includes('headache') || lower.includes('chakkar') || lower.includes('fat rahi hai') ||
-      lower.includes('ghabrahat') || lower.includes('chest tight') || lower.includes('dizziness')) {
+      lower.includes('throw up') || lower.includes('sir dard') || lower.includes('headache') ||
+      lower.includes('chakkar') || lower.includes('fat rahi') || lower.includes('ghabrahat') ||
+      lower.includes('chest tight') || lower.includes('dizziness') || lower.includes('sick to my stomach'))
     return 'SOMATIC_PHYSICAL';
-  }
 
-  // 2. Math Anxiety (High frequency specific trigger)
-  if (/\b(math|maths|calculus|algebra|integration|differentiation|trig|geometry|stats|statistics)\b/i.test(lower)) {
+  if (/\b(math|maths|calculus|algebra|integration|differentiation|trig|geometry|stats|statistics)\b/i.test(lower))
     return 'MATH_SPECIFIC';
-  }
 
-  // 3. Other Academic Subjects
-  if (/\b(physics|chemistry|chem|coding|dsa|programming|biology|bio|accounts|accounting|economics|law)\b/i.test(lower)) {
+  if (/\b(physics|chemistry|chem|coding|dsa|programming|biology|bio|accounts|accounting|economics|law)\b/i.test(lower))
     return 'OTHER_SUBJECT';
-  }
 
-  // 4. Dating / Romantic Loneliness / Girlfriend / Relationship
-  if (lower.includes('need a gf') || lower.includes('gf chahiye') || lower.includes('want a gf') ||
+  if (lower.includes('gf chahiye') || lower.includes('need a gf') || lower.includes('want a gf') ||
       lower.includes('girlfriend') || lower.includes('bandi chahiye') || lower.includes('single hu') ||
-      lower.includes('no girlfriend') || lower.includes('crush') || lower.includes('dating') ||
-      lower.includes('kat gaya') || lower.includes('ladki') || lower.includes('propose')) {
+      lower.includes('crush') || lower.includes('dating') || lower.includes('kat gaya') ||
+      lower.includes('ladki') || lower.includes('propose'))
     return 'DATING_RELATIONSHIP';
-  }
 
-  // 5. Hinglish: Inability to study / Lack of focus / Procrastination
   if (lower.includes('padhai nahi ho') || lower.includes('padh nahi pa') || lower.includes('man nahi lag') ||
-      lower.includes('mann nahi lag') || lower.includes('padhne ka man') || lower.includes('focus nahi')) {
+      lower.includes('mann nahi lag') || lower.includes('padhne ka man') || lower.includes('focus nahi'))
     return 'CANNOT_STUDY';
-  }
 
-  // 6. Hinglish: Fear of Failure / Backlogs / Marks
   if (lower.includes('fail ho ja') || lower.includes('backlog') || lower.includes('marks nahi aa') ||
-      lower.includes('paper kharab') || lower.includes('fail hone ka darr')) {
+      lower.includes('paper kharab') || lower.includes('fail hone ka'))
     return 'FEAR_OF_FAILURE';
-  }
 
-  // 7. Hinglish: General Overwhelm / "Kuch samajh nahi aa raha"
   if (lower.includes('samajh nahi aa') || lower.includes('samajh nahi rha') || lower.includes('dimag kharab') ||
-      lower.includes('bohot tension') || lower.includes('sab bekaar') || lower.includes('sab fucked up')) {
+      lower.includes('bohot tension') || lower.includes('sab bekaar') || lower.includes('sab fucked'))
     return 'OVERWHELMED_GENERAL';
-  }
 
-  // 8. Parental Pressure / Family / Comparisons
-  if (lower.includes('parental') || lower.includes('parent') || lower.includes('family') ||
-      lower.includes('father') || lower.includes('mother') || lower.includes('mom') ||
-      lower.includes('dad') || lower.includes('sharma ji') || lower.includes('relatives') ||
-      lower.includes('cousin') || lower.includes('compar') || lower.includes('ghar wale') ||
-      lower.includes('taane') || lower.includes('daant')) {
+  if (lower.includes('parent') || lower.includes('family') || lower.includes('father') ||
+      lower.includes('mother') || lower.includes('mom') || lower.includes('dad') ||
+      lower.includes('ghar wale') || lower.includes('taane') || lower.includes('compar') ||
+      lower.includes('cousin') || lower.includes('relatives') || lower.includes('sharma ji'))
     return 'PARENTAL_PRESSURE';
-  }
 
-  // 9. Deflection ("but im okay", "im fine", "sab theek hai")
-  if (/^(but\s+)?(i'?m|am)\s*(ok|okay|fine|good|alright)(\s+(now|though|today|so far))?$/i.test(lower) ||
-      /^(it'?s|its)\s*(whatever|nothing|fine|okay|ok|all good)$/i.test(lower) ||
-      lower === 'im okay' || lower === "i'm okay" || lower === 'but im okay' || lower === "but i'm okay" ||
-      lower === 'sab theek hai' || lower === 'kuch nahi') {
+  if (/^(but\s+)?(i'?m|am)\s*(ok|okay|fine|good|alright)(\s+(now|though|today))?$/i.test(lower) ||
+      lower === 'sab theek hai' || lower === 'kuch nahi' || lower === 'im fine' || lower === "i'm fine")
     return 'DEFLECTION';
-  }
 
-  // 10. Short venting ("ugh", "sigh", "damn", "argh", "smh")
-  if (/^(ugh+|sigh+|argh+|damn+|dammit|smh|fuck|shit|crap|pfft|mehh+|gah+|fml)$/i.test(lower) ||
-      lower === 'thak gaya hu' || lower === 'bore ho raha hu') {
-    return 'VENTING_EXHAUSTION';
-  }
+  if (/^(ugh+|sigh+|argh+|damn+|dammit|smh|fuck|shit|crap|pfft|mehh+|fml)$/i.test(lower) ||
+      lower === 'thak gaya hu' || lower === 'bore ho raha hu')
+    return 'VENTING';
 
-  // 11. Confusion ("what", "huh", "kya bol raha hai")
-  if (/^(what|wat|wut|huh|bruh|bro|wth|wtf|um+|umm+|uh+|lol|lmao|k)$/i.test(lower) ||
-      lower.includes('what do you mean') || lower.includes('kya bol rahe ho') || lower.includes('kya matlab')) {
+  if (/^(what|wat|huh|bruh|bro|wth|wtf|um+|umm+|lol|lmao|k)$/i.test(lower) ||
+      lower.includes('kya bol rahe ho') || lower.includes('kya matlab'))
     return 'CONFUSION';
-  }
 
-  // 12. Short affirmations
-  if (/^(yes|yeah|yep|ya|yup|nah|no|nope|ok|okay|ok ok|hmm+|hm+|sure|true|right|ha|haan|nahi)$/i.test(lower)) {
+  if (/^(yes|yeah|yep|ya|yup|nah|no|nope|ok|okay|hmm+|hm+|sure|right|ha|haan|nahi)$/i.test(lower))
     return 'AFFIRMATION';
-  }
 
-  // 13. Gratitude
-  if (lower.includes('thank') || lower.includes('dhanyawad') || lower.includes('shukriya') || lower.includes('thx')) {
+  if (lower.includes('thank') || lower.includes('shukriya') || lower.includes('dhanyawad') || lower.includes('thx'))
     return 'GRATITUDE';
-  }
 
-  // 14. Academic Stress general
-  if (lower.includes('academic') || lower.includes('exam') || lower.includes('study') || lower.includes('studies') ||
-      lower.includes('syllabus') || lower.includes('assignment') || lower.includes('marks') ||
-      lower.includes('score') || lower.includes('grades') || lower.includes('cgpa') || lower.includes('gpa') ||
-      lower.includes('college') || lower.includes('homework') || lower.includes('pressure') || lower.includes('deadlines')) {
+  if (lower.includes('exam') || lower.includes('study') || lower.includes('syllabus') ||
+      lower.includes('assignment') || lower.includes('marks') || lower.includes('grades') ||
+      lower.includes('cgpa') || lower.includes('college') || lower.includes('deadlines') ||
+      lower.includes('pressure') || lower.includes('academic'))
     return 'ACADEMIC_STRESS';
-  }
 
-  // 15. Anxiety general
   if (lower.includes('panic') || lower.includes('anxious') || lower.includes('anxiety') ||
-      lower.includes('overthinking') || lower.includes('nervous') || lower.includes('scared') || lower.includes('dread')) {
+      lower.includes('overthinking') || lower.includes('nervous') || lower.includes('dread'))
     return 'ANXIETY_GENERAL';
-  }
 
-  // 16. Loneliness general
   if (lower.includes('lonely') || lower.includes('alone') || lower.includes('breakup') ||
-      lower.includes('friend') || lower.includes('nobody cares') || lower.includes('ignored') || lower.includes('akelapan')) {
+      lower.includes('nobody cares') || lower.includes('ignored') || lower.includes('akelapan'))
     return 'LONELINESS';
-  }
 
-  // 17. Sleep / Tiredness
-  if (lower.includes('sleep') || lower.includes('insomnia') || lower.includes('tired') || lower.includes('exhausted') ||
-      lower.includes('burnout') || lower.includes('drained') || lower.includes('neend')) {
+  if (lower.includes('sleep') || lower.includes('insomnia') || lower.includes('tired') ||
+      lower.includes('exhausted') || lower.includes('burnout') || lower.includes('neend'))
     return 'SLEEP_EXHAUSTION';
-  }
 
   return 'GENERAL';
 }
 
-/**
- * Get the last message sent by Sukhi
- */
+/* =====================================================================
+   OFF-TOPIC GUARD (mental-health-only scope for local engine)
+   Strict multi-word/code patterns only — never fires on emotional venting.
+   ===================================================================== */
+function isOffTopicRequest(text) {
+  const lower = (text || '').toLowerCase().trim();
+  if (!lower) return false;
+
+  const patterns = [
+    'write a code', 'write code', 'write a function', 'write a program',
+    'debug', 'leetcode', 'compile error', 'fix this code', 'fix my code',
+    'python', 'javascript', 'java program', 'c++ program', 'sql query',
+    'html page', 'css for', 'build a website', 'make an app',
+    'capital of', 'who is the prime minister', 'who is the president',
+    'who invented', 'when was', 'how many countries', 'distance from',
+    'solve this', 'solve the equation', 'solve for x', 'calculate',
+    'do my homework', 'write my assignment', 'write an essay',
+    'make my resume', 'write a mail', 'write an email', 'write a letter',
+    'write a paragraph', 'complete my project',
+    'translate', 'meaning of this word',
+    'tell me a joke', 'sing a song', 'give me a riddle',
+    'who won the', 'score of the match', 'movie review'
+  ];
+  if (patterns.some((p) => lower.includes(p))) return true;
+
+  // Bare arithmetic homework like "12 + 5" or "solve 2x+3=7"
+  if (/\d+\s*[+\-*/^%]\s*\d+/.test(lower) && !/(exam|marks|days|hours|percent|%|\bkg\b)/.test(lower)) return true;
+
+  return false;
+}
+
 function getLastSukhiMessage(history) {
   for (let i = history.length - 1; i >= 0; i--) {
-    if (history[i].sender_role === 'helper') {
-      return history[i].content || '';
-    }
+    if (history[i].sender_role === 'helper') return history[i].content || '';
   }
   return '';
 }
 
 /* =====================================================================
-   DEEP CONTEXT NLU & DIALOGUE GENERATOR (NATURAL, ZERO-CORNY TONE)
+   LOCAL FALLBACK RESPONSE ENGINE
    ===================================================================== */
-
 function generateContextualLocalResponse(userMessage, history = [], roomTopic = '') {
   const text = (userMessage || '').trim();
   const lower = text.toLowerCase();
-  const currentIntent = classifyUserIntent(text);
-  const lastSukhi = getLastSukhiMessage(history);
-  const lastSukhiLower = lastSukhi.toLowerCase();
+  const intent = classifyUserIntent(text);
+  const lastSukhi = getLastSukhiMessage(history).toLowerCase();
 
-  const tryCandidates = (candidates) => {
+  const pick = (candidates) => {
     for (const c of candidates) {
-      if (c && !wasAlreadySaidBySukhi(c, history)) {
-        return c;
-      }
+      if (c && !wasAlreadySaidBySukhi(c, history)) return c;
     }
-    return `I hear what you are saying about "${text.length > 40 ? text.slice(0, 40) + '...' : text}". Tell me a bit more about what is going on right now.`;
+    return `Tell me a bit more about what is going on right now.`;
   };
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // 1. SOMATIC / PHYSICAL STRESS ("i feel pukish", nausea, headache, ghabrahat)
-  // ──────────────────────────────────────────────────────────────────────────
-  if (currentIntent === 'SOMATIC_PHYSICAL') {
-    return tryCandidates([
-      `Feeling pukish or nauseous is your body's physical reaction when stress or anxiety spikes. Your nervous system is flooded right now.
+  // Scope guard: off-topic requests get a warm redirect, never an answer
+  if (isOffTopicRequest(text)) return pick([
+    `That's outside what I'm here for — I'm just a listening ear for whatever you're feeling, not homework or general questions. What's been weighing on your mind lately?`,
+    `I can't help with that one since I'm only here for emotional support and mental wellness. How have you been feeling these days?`,
+    `That's not something I can do — my only job here is to listen and support you through what you're feeling. What would you like to talk about?`
+  ]);
 
-Please step away from your desk or screen for five minutes. Drink a small sip of cold water, loosen any tight clothing, and take slow breaths into your belly. What was happening right before you started feeling this physical nausea?`,
-      `That physical sick feeling in your stomach happens when anxiety hits fight-or-flight mode. Don't force yourself to study or push through this right now — your body needs to calm down first.
+  if (intent === 'SOMATIC_PHYSICAL') return pick([
+    `Feeling nauseous or pukish is your body's physical response when stress spikes — your nervous system is flooded right now. Step away from your desk, take slow breaths into your belly, and sip some cold water. What was happening right before this started?`,
+    `That sick feeling in your stomach kicks in when anxiety goes into overdrive — don't force yourself to push through it. What were you doing or thinking about right before it started?`,
+    `When stress turns physical like that it usually means you've been running on high alert for a while. How does your head feel right now?`
+  ]);
 
-Are you dealing with an upcoming test, or did something specific just happen that set this off?`,
-      `When stress turns physical like that, it means you have been running on high alert for too long. Sit back, let your shoulders drop, and take a couple of slow sips of water. How does your head and chest feel right now?`
+  if (intent === 'MATH_SPECIFIC' || (lastSukhi.includes('subject') && lower.includes('math'))) return pick([
+    `Math anxiety is real — when formulas stop clicking it creates an immediate mental block that makes even starting feel impossible. Is it a specific chapter you're stuck on, an upcoming exam, or feeling like you've fallen too far behind?`,
+    `Staring at math problems when your brain is already tired is one of the fastest ways to spiral. Which specific topic is giving you the most trouble?`,
+    `Math usually feels all-or-nothing, but it almost always comes down to one or two concepts that got missed. What are you currently covering in class?`
+  ]);
+
+  if (intent === 'OTHER_SUBJECT') return pick([
+    `That subject gets genuinely exhausting when there is so much to absorb. What specific part of it is tripping you up right now?`,
+    `Feeling stuck on coursework when deadlines are close is rough. Are you working toward a specific test or trying to get an assignment done?`
+  ]);
+
+  if (intent === 'DATING_RELATIONSHIP') return pick([
+    `Being single when it feels like everyone around you is paired up can feel really isolating — it's usually less about a label and more about wanting someone to genuinely connect with. Has this been hitting harder recently, or is there someone specific on your mind?`,
+    `That desire for connection makes complete sense — seeing couples everywhere in college makes you feel like you're missing out on a whole part of life. Do you feel lonely in general, or is it specifically about wanting someone special?`,
+    `Wanting a relationship is natural, but it gets complicated when it starts to feel like you're not enough on your own. What kind of connection are you looking for?`
+  ]);
+
+  if (intent === 'CANNOT_STUDY') return pick([
+    `Padhai mein man na lagna tab hota hai jab dimag pehle se hi thaka hua ho — khud ko force karne se sirf guilt badhta hai, kuch absorb nahi hota. Abhi book band karo aur 10 minute ka real break lo. Aaj ke din kaunsa ek topic sabse zaroori hai?`,
+    `Jab syllabus ka bojh bahut bada lagta hai toh dimag freeze ho jaata hai aur shuru karna impossible lagta hai. Poori book mat dekho — bas agle 15 minute ke liye ek chhoti si cheez choose karo. Kaun si hai woh?`
+  ]);
+
+  if (intent === 'FEAR_OF_FAILURE') return pick([
+    `Fail hone ka darr hume pehle se exhaust kar deta hai, aur panic mein padhai aur mushkil ho jaati hai. Ground reality kya hai — exam kab hai aur kitna syllabus cover hua hai?`,
+    `Ek exam tumhari worth decide nahi karta, lekin ye samajhna tab bahut mushkil hota hai jab pressure mein ho. Minimum paas ke liye kaunse chapters sabse important hain?`
+  ]);
+
+  if (intent === 'OVERWHELMED_GENERAL') return pick([
+    `Jab har taraf se cheezein pile up hoti hain toh dimag mein fog aa jaata hai — sab ek saath solve karne ki koshish mat karo. Jo cheez sabse zyada dimag mein ghoom rahi hai, woh kya hai?`,
+    `Itna load ek saath lena kisi ko bhi exhaust kar deta hai. College ki wajah se hai ya ghar mein bhi kuch chal raha hai?`
+  ]);
+
+  if (lastSukhi.includes('compare') || lastSukhi.includes('relatives')) {
+    if (lower.includes('compar') || lower.includes('cousin') || lower.includes('yes') || lower.includes('yeah') || lower.includes('haan')) return pick([
+      `Constantly being compared to cousins or toppers is exhausting and unfair — it sends the message that your effort doesn't count unless it beats someone else. When it happens at home, do you usually stay quiet or does it turn into an argument?`,
+      `Comparisons chip away at you slowly, especially from family who don't see the damage they're doing. How do you usually handle it when you hear those things?`
     ]);
   }
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // 2. MATH ANXIETY & SPECIFIC SUBJECTS ("i think its math", calculus, algebra)
-  // ──────────────────────────────────────────────────────────────────────────
-  if (currentIntent === 'MATH_SPECIFIC' || (lastSukhiLower.includes('subject') && lower.includes('math'))) {
-    return tryCandidates([
-      `Math anxiety is completely real. When problems aren't clicking or formulas look like another language, it triggers an immediate feeling of panic and mental paralysis.
+  if (intent === 'PARENTAL_PRESSURE') return pick([
+    `Parental expectations can feel like an enormous weight — many families tie their pride directly to marks, which makes you feel like you're carrying their entire happiness on your shoulders. Do they openly pressure you, or is it more an unspoken disappointment you feel around the house?`,
+    `Dealing with family pressure is draining because you care about them, but their expectations leave no room for your own peace. Have you ever told them how stressed you actually feel, or does that conversation get shut down quickly?`,
+    `You're a person with real limits, not a machine built to produce exam scores. What is the hardest part of the family expectations for you right now?`
+  ]);
 
-What's going on with math right now — is it an upcoming exam, a chapter you are completely stuck on, or feeling like you've fallen too far behind?`,
-      `Staring at math problem sets when your brain is already tired is one of the quickest ways to feel overwhelmed. 
+  if (intent === 'DEFLECTION') return pick([
+    `Saying you're okay is often a habit when explaining things feels like too much effort — you don't have to explain anything here. What's actually been on your mind today?`,
+    `You don't have to keep a brave face here. How has your day actually been?`
+  ]);
 
-Which specific topic or chapter is giving you the hardest time right now? Let's take it one step at a time without any pressure.`,
-      `Math tends to make people feel like it's all-or-nothing, but it usually comes down to just one or two foundational concepts that got missed along the way. What topic are you covering in class right now?`
+  if (intent === 'VENTING') return pick([
+    `That says you're running on empty right now. You don't need full sentences — what is the most draining thing on your mind today?`,
+    `Sounds like you've just hit a wall. What happened today that pushed you there?`
+  ]);
+
+  if (intent === 'CONFUSION') return pick([
+    `Let's keep it simple. Tell me what's actually going on with you right now in your own words — I'm listening.`,
+    `What's on your mind right now?`
+  ]);
+
+  if (intent === 'AFFIRMATION') {
+    if (lastSukhi.includes('exam') || lastSukhi.includes('math') || lastSukhi.includes('subject')) return pick([
+      `Breaking it into one small piece for the next hour makes it a lot more manageable. What is one specific topic you could look at right now?`,
+      `What is the single nearest deadline you need to hit?`
     ]);
-  }
-
-  if (currentIntent === 'OTHER_SUBJECT') {
-    return tryCandidates([
-      `That subject can be genuinely exhausting when there is so much content to memorize or apply. What specific part of it is giving you trouble right now?`,
-      `Feeling stuck on that coursework is frustrating, especially when deadlines are close. Are you preparing for a specific test or trying to finish an assignment?`
-    ]);
-  }
-
-  // ──────────────────────────────────────────────────────────────────────────
-  // 3. DATING / ROMANTIC LONELINESS ("i need a gf", single hu, bandi chahiye)
-  // ──────────────────────────────────────────────────────────────────────────
-  if (currentIntent === 'DATING_RELATIONSHIP') {
-    return tryCandidates([
-      `Being single when it feels like everyone around you is coupled up can feel really isolating. It's usually less about just having a title and more about wanting genuine connection — someone to talk to, share small things with, and feel understood by.
-
-Has this been hitting you especially hard recently, or is there someone specific you've been thinking about?`,
-      `That desire for companionship makes complete sense. In college, seeing couples everywhere can make you feel like you are missing out on an entire part of life.
-
-Do you feel more lonely in general, or is it specifically that you want someone special to connect with?`,
-      `Wanting a relationship is completely natural, but it gets tough when it turns into feeling like you aren't enough on your own. What kind of connection are you hoping to find?`
-    ]);
-  }
-
-  // ──────────────────────────────────────────────────────────────────────────
-  // 4. HINGLISH: CANNOT STUDY / PROCRASTINATION ("padhai nahi ho rahi")
-  // ──────────────────────────────────────────────────────────────────────────
-  if (currentIntent === 'CANNOT_STUDY') {
-    return tryCandidates([
-      `Padhai me man na lagna bohot normal hai, especially jab dimag pehle se hi thaka hua ho. Jab hum khud ko force karte hain, to kitabon ke samne baithkar bhi kuch absorb nahi hota.
-
-Filhaal ke liye book band karo aur 10 minute ka real break lo — bina phone scroll kiye. Aaj ke din sabse zaruri topic kaun sa hai jo bas finish karna hai?`,
-      `Jab syllabus ka burden bohot bada lagta hai, tab dimag freeze ho jata hai aur padhai shuru hi nahi hoti. Poori book mat dekho abhi. Bas agle 15 minute ke liye ek chhota sa page ya summary dekhne ka try kar sakte ho?`
-    ]);
-  }
-
-  // ──────────────────────────────────────────────────────────────────────────
-  // 5. HINGLISH: FEAR OF FAILURE / BACKLOGS ("fail ho jaunga", "marks nahi aa rahe")
-  // ──────────────────────────────────────────────────────────────────────────
-  if (currentIntent === 'FEAR_OF_FAILURE') {
-    return tryCandidates([
-      `Fail hone ka ya backlog ka darr bohot bhari hota hai, samajh sakta hu. Hamare education system me marks ko hi sab kuch bana diya jata hai, isliye lagta hai ki agar paper kharab gaya to sab khatam ho jayega.
-
-Lekin ek exam tumhari poori worth decide nahi karta. Abhi ke time me ground reality kya hai — exam kab hai aur kitna syllabus bacha hai?`,
-      `Paper kharab hone ka darr hume pehle se hi thaka deta hai. Panic me padhai aur mushkil ho jati hai. Chalo calm hokar dekhte hain: pass hone ke liye minimum kaun se chapters sabse important hain?`
-    ]);
-  }
-
-  // ──────────────────────────────────────────────────────────────────────────
-  // 6. HINGLISH: GENERAL OVERWHELM ("kuch samajh nahi aa raha", "bohot tension hai")
-  // ──────────────────────────────────────────────────────────────────────────
-  if (currentIntent === 'OVERWHELMED_GENERAL') {
-    return tryCandidates([
-      `Jab har taraf se cheezein pile up hoti hain, to dimag me fog aa jata hai aur kuch samajh nahi aata. Aise me sab solve karne ki koshish mat karo.
-
-Thoda sa pani piyo aur deep breath lo. Sabse pehli cheez kya hai jo dimag me ghoom rahi hai?`,
-      `Itna zyada load ek saath lene se koi bhi exhaust ho jayega. Koi jaldbazi nahi hai, aaram se batao — college ki vajah se tension hai ya ghar aur personal life me kuch chal raha hai?`
-    ]);
-  }
-
-  // ──────────────────────────────────────────────────────────────────────────
-  // 7. QUESTION-ANSWER TRACKING FOR PREVIOUS QUESTIONS
-  // ──────────────────────────────────────────────────────────────────────────
-
-  // Did Sukhi ask: "What specific deadline or subject is taking up the most mental space for you right now?"
-  if (lastSukhiLower.includes('specific deadline or subject') || lastSukhiLower.includes('which specific subject')) {
-    if (lower.includes('math')) {
-      return tryCandidates([
-        `Math anxiety is completely real. When formulas and problem sets aren't clicking, it easily creates a block in your mind.
-
-What part of math is causing the issue — is it understanding the concepts, lack of practice, or an upcoming exam date?`,
-        `Math can feel brutal when you fall behind even a couple of lectures. What specific topic are you dealing with in math right now?`
-      ]);
-    }
-    if (lower.includes('exam') || lower.includes('test') || lower.includes('paper')) {
-      return tryCandidates([
-        `Exam deadlines create constant low-level panic until the paper is over. When is this exam scheduled, and how much of the syllabus do you feel confident about so far?`,
-        `Preparing for an upcoming paper is stressful. Let's look at it practically: which topics carry the highest weightage that you could focus on first?`
-      ]);
-    }
-  }
-
-  // Did Sukhi ask about comparisons or relatives?
-  if (lastSukhiLower.includes('compare') || lastSukhiLower.includes('relatives')) {
-    if (lower.includes('compar') || lower.includes('cousin') || lower.includes('relative') || lower.includes('sharma') || lower.includes('yes') || lower.includes('yeah')) {
-      return tryCandidates([
-        `Being constantly compared to cousins or toppers is unfair and exhausting. It sends a message that your effort doesn't count unless it beats someone else.
-
-Remember that you are studying to build your own life, not to win a family trophy. When these comparisons happen at home, do you usually stay quiet, or does it turn into an argument?`,
-        `Comparisons are toxic, especially when family members do it without realizing the damage. Your cousins have different strengths and different lives. How do you usually deal with hearing those comparisons?`
-      ]);
-    }
-  }
-
-  // ──────────────────────────────────────────────────────────────────────────
-  // 8. PARENTAL PRESSURE & FAMILY
-  // ──────────────────────────────────────────────────────────────────────────
-  if (currentIntent === 'PARENTAL_PRESSURE') {
-    return tryCandidates([
-      `Parental expectations can feel like an immense weight. In many families, parents tie their pride and sacrifices directly to academic marks, which makes you feel like you are carrying their entire happiness on your shoulders.
-
-Do they openly pressure you about specific marks and ranks, or is it more of an unspoken disappointment you constantly feel around the house?`,
-      `Dealing with pressure from parents is exhausting because you care about them, but their expectations leave no room for your own mental peace.
-
-Have you ever tried expressing how stressed you feel, or does communication at home shut down quickly?`,
-      `Remember that you are a human being with your own limits, not a machine designed to produce exam scores for others. What is the hardest part about dealing with family expectations for you right now?`
-    ]);
-  }
-
-  // ──────────────────────────────────────────────────────────────────────────
-  // 9. DEFLECTION ("but im okay", "im fine")
-  // ──────────────────────────────────────────────────────────────────────────
-  if (currentIntent === 'DEFLECTION') {
-    return tryCandidates([
-      `Saying "I'm okay" is a common habit when explaining things feels like too much work. If you truly are doing fine right now, that's good. But if you just need a place to vent without having to put on a brave face, you can speak freely here.
-
-What has been on your mind today?`,
-      `It is completely fine if you don't feel like diving deep right now. Just know you don't have to pretend everything is sorted here. How has your day felt overall?`
-    ]);
-  }
-
-  // ──────────────────────────────────────────────────────────────────────────
-  // 10. SHORT VENTING ("ugh", "sigh")
-  // ──────────────────────────────────────────────────────────────────────────
-  if (currentIntent === 'VENTING_EXHAUSTION') {
-    return tryCandidates([
-      `That sigh says you are running on empty right now. You don't have to explain in full sentences. What is the most draining thing on your mind today?`,
-      `Sounds like you are just completely fed up or overwhelmed with things. What happened today that pushed you to this point?`
-    ]);
-  }
-
-  // ──────────────────────────────────────────────────────────────────────────
-  // 11. CONFUSION ("what", "huh")
-  // ──────────────────────────────────────────────────────────────────────────
-  if (currentIntent === 'CONFUSION') {
-    return tryCandidates([
-      `Let me keep it simple and direct. Tell me what's actually going on with you in your own words — I'm listening.`,
-      `No complications here. What's on your mind right now?`
-    ]);
-  }
-
-  // ──────────────────────────────────────────────────────────────────────────
-  // 12. AFFIRMATIONS ("yes", "ok")
-  // ──────────────────────────────────────────────────────────────────────────
-  if (currentIntent === 'AFFIRMATION') {
-    if (lastSukhiLower.includes('exam') || lastSukhiLower.includes('math') || lastSukhiLower.includes('subject')) {
-      return tryCandidates([
-        `Understood. Breaking the work into one small piece for the next hour can make things a lot more manageable. What is one specific question or topic you could review right now?`,
-        `One step at a time. What is the single nearest deadline you have to meet?`
-      ]);
-    }
-    return tryCandidates([
+    return pick([
       `I'm listening. What else has been going on?`,
       `Take your time. What is the next thing on your mind?`
     ]);
   }
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // 13. ACADEMIC STRESS GENERAL
-  // ──────────────────────────────────────────────────────────────────────────
-  if (currentIntent === 'ACADEMIC_STRESS' || roomTopic.toLowerCase().includes('academic')) {
-    return tryCandidates([
-      `Academic pressure can feel constant, especially when lectures, assignments, and exams all hit at the same time.
+  if (intent === 'GRATITUDE') return pick([
+    `You don't need to thank me — just keep talking if you need to. Is there anything else on your mind?`,
+    `Glad it helped a bit. How are you feeling right now compared to when we started talking?`
+  ]);
 
-Which part feels the heaviest right now — an upcoming test, pending assignments, or feeling behind on syllabus?`,
-      `When academic workload piles up, it feels impossible to relax even when you take a break. What is the most urgent thing you need to get done this week?`,
-      `Balancing college expectations with your own energy is tough. What subject or project has been draining you the most recently?`
-    ]);
-  }
+  if (intent === 'ACADEMIC_STRESS' || roomTopic.toLowerCase().includes('academic')) return pick([
+    `Academic pressure builds up fast when lectures, assignments, and exams all pile on at once. Which part feels the heaviest right now — an upcoming test, pending work, or feeling behind on the syllabus?`,
+    `When workload piles up, it's impossible to relax even on a break. What is the most urgent thing on your plate this week?`,
+    `What subject or piece of work has been draining you the most lately?`
+  ]);
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // 14. GENERAL FALLBACK (Clean, natural, zero corny language)
-  // ──────────────────────────────────────────────────────────────────────────
+  if (intent === 'ANXIETY_GENERAL') return pick([
+    `That feeling of constant dread or panic is exhausting, especially when you can't switch it off. What feels like the biggest source of it right now?`,
+    `Anxiety usually latches onto something specific even when it feels general. What keeps coming back to your mind most?`
+  ]);
+
+  if (intent === 'LONELINESS') return pick([
+    `Feeling like no one really sees you or cares is genuinely painful, and it gets heavier when you are surrounded by people but still feel alone. Has something specific happened recently, or has this been building for a while?`,
+    `That sense of isolation hits differently in college where everyone seems to be connected. Is it more about missing close friendships, or feeling disconnected from the people already around you?`
+  ]);
+
+  if (intent === 'SLEEP_EXHAUSTION') return pick([
+    `Running on broken sleep makes everything harder — your brain literally cannot process stress the same way. Has the sleep been bad for a few nights or is this ongoing?`,
+    `Exhaustion like that isn't just physical, it dulls everything including your ability to cope. What do you think is keeping you from sleeping?`
+  ]);
+
+  // General fallback
   const snippet = text.length > 50 ? `${text.slice(0, 50)}...` : text;
-  return tryCandidates([
-    `I hear you regarding "${snippet}". What has been the most frustrating part about that for you?`,
-    `Tell me a bit more about "${snippet}" — what is currently happening with that?`,
-    `Thank you for sharing that. What would feel most helpful for you to talk through right now?`
+  return pick([
+    `That sounds like it's been weighing on you. What has felt most frustrating about it?`,
+    `Tell me more — what specifically is happening with "${snippet}" right now?`,
+    `What would feel most helpful to talk through right now?`
   ]);
 }
 
 /* =====================================================================
-   MAIN SUKHI AI RESPONSE PIPELINE
-   Priority 1: Groq LLM (llama-3.3-70b-versatile, ~300ms)
-   Priority 2: Kibou Context & Hinglish Engine (Instant, clean tone)
+   GROQ API CALL — with HTTP status checking
    ===================================================================== */
+async function callGroqModel(model, messages, groqKey) {
+  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${groqKey}`
+    },
+    body: JSON.stringify({
+      model,
+      messages,
+      temperature: 0.6,
+      max_tokens: 200,
+      presence_penalty: 0.4,
+      frequency_penalty: 0.5
+    }),
+    signal: AbortSignal.timeout(8000)
+  });
 
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    console.warn(`[Sukhi] ${model} → HTTP ${res.status}: ${errText.slice(0, 120)}`);
+    return null;
+  }
+
+  const data = await res.json();
+  return data.choices?.[0]?.message?.content?.trim() || null;
+}
+
+/* =====================================================================
+   MAIN RESPONSE PIPELINE
+   1. Crisis guard
+   2. Groq LLM (qwen/qwen3.8-27b → compound-mini → compound → gpt-oss-20b)
+   3. Local Kibou context engine (instant, zero-dependency fallback)
+   ===================================================================== */
 export async function getSukhiResponse(userMessage, conversationHistory = [], roomTopic = '') {
-  // 1. Crisis Check
+  // Crisis guard
   const crisisCheck = detectCrisis(userMessage);
   if (crisisCheck.isCrisis || containsCrisisSignal(userMessage)) {
-    return {
-      content: CRISIS_FALLBACK_RESPONSE,
-      isCrisis: true
-    };
+    return { content: CRISIS_FALLBACK_RESPONSE, isCrisis: true };
   }
 
   const groqKey = runtimeGroqKey || process.env.GROQ_API_KEY;
 
-  // Format conversation history for LLM
+  // Build message array for LLM
   const formattedHistory = (conversationHistory || [])
-    .filter((m) => m.content && m.content.trim().length > 0)
-    .slice(-12)
+    .filter((m) => m.content?.trim().length > 0)
+    .slice(-10)
     .map((m) => ({
       role: m.sender_role === 'seeker' ? 'user' : 'assistant',
       content: m.content.trim()
     }));
 
-  const systemPromptWithTopic = roomTopic
-    ? `${SUKHI_SYSTEM_PROMPT}\n\nNote: The user entered this conversation under the category: "${roomTopic}". Keep this context in mind.`
+  const systemContent = roomTopic
+    ? `${SUKHI_SYSTEM_PROMPT}\n\nContext: The user entered this chat under the category "${roomTopic}". Keep this in mind.`
     : SUKHI_SYSTEM_PROMPT;
 
   const messages = [
-    { role: 'system', content: systemPromptWithTopic },
+    { role: 'system', content: systemContent },
     ...formattedHistory,
     { role: 'user', content: userMessage }
   ];
 
-  // 2. Groq LLM (Llama 3.3 70B)
+  // Try Groq LLM models in order
   if (groqKey && groqKey.startsWith('gsk_')) {
-    for (const model of ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant']) {
+    for (const model of GROQ_MODELS) {
       try {
-        const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${groqKey}`
-          },
-          body: JSON.stringify({
-            model,
-            messages,
-            temperature: 0.65,
-            max_tokens: 400,
-            presence_penalty: 0.5,
-            frequency_penalty: 0.4
-          }),
-          signal: AbortSignal.timeout(6000)
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          let reply = data.choices?.[0]?.message?.content;
-          if (reply?.trim()) {
-            reply = reply.replace(/[\u{1F300}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '');
-            if (!wasAlreadySaidBySukhi(reply, conversationHistory)) {
-              return { content: reply.trim(), isCrisis: false };
-            }
+        const reply = await callGroqModel(model, messages, groqKey);
+        if (reply) {
+          // Strip any emojis that slip through
+          const clean = reply
+            .replace(/[\u{1F300}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')
+            .trim();
+          if (clean.length > 0 && !wasAlreadySaidBySukhi(clean, conversationHistory)) {
+            console.log(`[Sukhi] Response via ${model}`);
+            return { content: clean, isCrisis: false };
           }
         }
       } catch (e) {
-        continue;
+        console.warn(`[Sukhi] ${model} error: ${e.message}`);
       }
     }
+    console.warn('[Sukhi] All Groq models failed — using local engine');
   }
 
-  // 3. Kibou Context & Hinglish Engine (Instant, natural, zero corny words)
-  const contextualReply = generateContextualLocalResponse(userMessage, conversationHistory, roomTopic);
+  // Local fallback
   return {
-    content: contextualReply,
+    content: generateContextualLocalResponse(userMessage, conversationHistory, roomTopic),
     isCrisis: false
   };
 }

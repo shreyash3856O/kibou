@@ -207,34 +207,6 @@ export default function SeekerDashboard() {
       ) : (
         /* Seeker Form */
         <div>
-          {/* Sukhi Featured Card */}
-          <div 
-            onClick={handleStartSukhi}
-            className="flat-card" 
-            style={{ 
-              cursor: 'pointer',
-              background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(168, 85, 247, 0.12) 100%)',
-              border: '1px solid rgba(99, 102, 241, 0.3)',
-              marginBottom: '20px',
-              padding: '14px 16px'
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '700', fontSize: '0.95rem' }}>
-                  <span>Meet Sukhi (AI Companion)</span>
-                  <span style={{ fontSize: '0.68rem', backgroundColor: 'var(--btn-accent-bg)', color: '#fff', padding: '1px 6px', borderRadius: '10px' }}>24/7 Instant</span>
-                </div>
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '3px' }}>
-                  Warm, mindful, and culturally tuned peer listener. No waiting required.
-                </div>
-              </div>
-              <button className="btn btn-accent" style={{ padding: '6px 12px', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
-                Chat Now
-              </button>
-            </div>
-          </div>
-
           <div style={{ marginBottom: '16px' }}>
             <div style={{ fontSize: '1.15rem', fontWeight: '700', marginBottom: '4px' }}>
               Select a Topic

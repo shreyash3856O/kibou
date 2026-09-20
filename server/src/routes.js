@@ -688,7 +688,7 @@ router.get('/admin/reports/:id', requireAdmin, (req, res) => {
 
 router.post('/admin/reports/:id/action', requireAdmin, (req, res) => {
   try {
-    const { action, notes, target_session_id, target_ip } = req.body;
+    const { action, notes, target_session_id } = req.body;
     const db = getDb();
     const report = db.reports?.find((r) => r.report_id === req.params.id);
     if (!report) {
@@ -706,13 +706,7 @@ router.post('/admin/reports/:id/action', requireAdmin, (req, res) => {
         const session = findSessionById(target_session_id);
         if (session) session.is_banned = true;
       }
-      if (target_ip) {
-        if (!db.banned_ips) db.banned_ips = [];
-        if (!db.banned_ips.includes(target_ip)) {
-          db.banned_ips.push(target_ip);
-        }
-      }
-      addAuditLog(req.admin.admin_id, 'BAN_USER', target_session_id || target_ip, `Banned via report ${report.report_id}`);
+      addAuditLog(req.admin.admin_id, 'BAN_USER', target_session_id || '', `Banned via report ${report.report_id}`);
     }
 
     saveDatabase();

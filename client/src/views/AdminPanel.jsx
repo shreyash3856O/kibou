@@ -160,12 +160,9 @@ export default function AdminPanel() {
     const targetSessionId = selectedReport.report.reporter_role === 'seeker'
       ? conv?.helper_session_id
       : conv?.seeker_session_id;
-    const targetIp = selectedReport.report.reporter_role === 'seeker'
-      ? conv?.helper_ip
-      : conv?.seeker_ip;
 
     try {
-      await api.actionAdminReport(selectedReport.report.report_id, action, actionNotes, targetSessionId, targetIp);
+      await api.actionAdminReport(selectedReport.report.report_id, action, actionNotes, targetSessionId);
       setSelectedReport(null);
       loadData();
     } catch (err) {
@@ -660,7 +657,7 @@ export default function AdminPanel() {
               <button onClick={() => setSelectedReport(null)} className="btn btn-secondary">Close</button>
               <button onClick={() => handleActionReport('dismiss')} className="btn btn-outline">Dismiss</button>
               <button onClick={() => handleActionReport('warn_user')} className="btn btn-primary">Warn</button>
-              <button onClick={() => handleActionReport('ban_user')} className="btn btn-danger">Ban & Block IP</button>
+              <button onClick={() => handleActionReport('ban_user')} className="btn btn-danger">Ban User</button>
             </div>
           </div>
         </div>
