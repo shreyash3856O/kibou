@@ -9,7 +9,8 @@ export default function HelperDashboard() {
     initHelperSession,
     setActiveConversation,
     setCurrentView,
-    bannedInfo
+    bannedInfo,
+    lockOutBanned
   } = useApp();
 
   const [isOnline, setIsOnline] = useState(true);
@@ -102,7 +103,9 @@ export default function HelperDashboard() {
       setActiveConversation(res.conversation);
       setCurrentView('chat');
     } catch (err) {
-      if (err.status === 409 || err.message?.includes('already accepted')) {
+      if (err?.status === 403 && err?.data?.is_banned) {
+        lockOutBanned({ role: 'helper' });
+      } else if (err.status === 409 || err.message?.includes('already accepted')) {
         alert('This request was just accepted by another peer helper.');
         loadQueue();
       } else {

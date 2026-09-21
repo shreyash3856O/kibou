@@ -18,7 +18,8 @@ export default function SeekerDashboard() {
     initSeekerSession,
     setActiveConversation,
     setCurrentView,
-    bannedInfo
+    bannedInfo,
+    lockOutBanned
   } = useApp();
 
   const [selectedTopic, setSelectedTopic] = useState(TOPICS[0]);
@@ -111,6 +112,10 @@ export default function SeekerDashboard() {
         setWaitingConversation(res.conversation);
       }
     } catch (err) {
+      if (err?.status === 403 && err?.data?.is_banned) {
+        lockOutBanned({ role: 'seeker' });
+        return;
+      }
       alert('Error: ' + err.message);
     } finally {
       setLoading(false);
@@ -139,6 +144,10 @@ export default function SeekerDashboard() {
       setActiveConversation(res.conversation);
       setCurrentView('chat');
     } catch (err) {
+      if (err?.status === 403 && err?.data?.is_banned) {
+        lockOutBanned({ role: 'seeker' });
+        return;
+      }
       alert('Failed to connect with Sukhi: ' + err.message);
     } finally {
       setLoading(false);

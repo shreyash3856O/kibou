@@ -28,7 +28,7 @@ import {
   saveDatabase
 } from './db.js';
 import { getSukhiResponse, setGroqApiKey, getAiStatus, SUKHI_SESSION_ID, SUKHI_ALIAS } from './sukhi.js';
-import { notifySessionBanned } from './socket.js';
+import { notifySessionBanned, endConversationsForBan } from './socket.js';
 import { getVapidPublicKey, savePushSubscription, removePushSubscription } from './push.js';
 
 const router = express.Router();
@@ -344,12 +344,19 @@ router.post('/conversations/start-sukhi', async (req, res) => {
   try {
     const { seeker_session_id, seeker_alias, topic, initial_prompt } = req.body;
 
+    if (isSessionIdBanned(seeker_session_id)) {
+      return res.status(403).json({ error: 'Account restricted', is_banned: true });
+    }
+
     let seeker = findSessionById(seeker_session_id);
     if (!seeker && seeker_session_id) {
       seeker = await findOrRecoverSession(seeker_session_id, 'seeker', seeker_alias || 'Anonymous Seeker');
     }
     if (!seeker) {
       return res.status(404).json({ error: 'Seeker session not found' });
+    }
+    if (seeker.is_banned) {
+      return res.status(403).json({ error: 'Account restricted', is_banned: true });
     }
 
     const conversationId = uuidv4();
@@ -658,9 +665,15 @@ router.post('/push/unsubscribe', (req, res) => {
 router.post('/admin-chats/start', (req, res) => {
   try {
     const { student_session_id, initial_message } = req.body;
+    if (isSessionIdBanned(student_session_id)) {
+      return res.status(403).json({ error: 'Account restricted', is_banned: true });
+    }
     const student = findSessionById(student_session_id);
     if (!student) {
       return res.status(404).json({ error: 'Session not found' });
+    }
+    if (student.is_banned) {
+      return res.status(403).json({ error: 'Account restricted', is_banned: true });
     }
 
     const db = getDb();
@@ -775,7 +788,8 @@ router.post('/admin/reports/:id/action', requireAdmin, (req, res) => {
     if (action === 'ban_user') {
       if (target_session_id) {
         banSessionById(target_session_id);
-        // Kick the banned user out of any live chat immediately
+        // Close their chats and kick them out of any live socket immediately
+        endConversationsForBan(target_session_id);
         notifySessionBanned(target_session_id);
       }
       addAuditLog(req.admin.admin_id, 'BAN_USER', target_session_id || '', `Banned via report ${report.report_id}`);
@@ -832,6 +846,7 @@ router.post('/admin/unban-ip', requireAdmin, (req, res) => {
 
 router.post('/admin/users/:sessionId/ban', requireAdmin, (req, res) => {
   const session = banSessionById(req.params.sessionId);
+  endConversationsForBan(req.params.sessionId);
   notifySessionBanned(req.params.sessionId);
   addAuditLog(req.admin.admin_id, 'BAN_SESSION', req.params.sessionId, 'Manual session ban');
 

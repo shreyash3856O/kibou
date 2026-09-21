@@ -50,6 +50,33 @@ export function AppProvider({ children }) {
     else setHelperSession(null);
   };
 
+  // Central ban lockout — safe to call from any stale closure because session
+  // matching reads live localStorage, and everything else is a state setter.
+  const lockOutBanned = ({ sessionId = null, role = null, message } = {}) => {
+    if (role === 'seeker' || role === 'helper') {
+      clearStoredSession(role);
+    } else if (sessionId) {
+      try {
+        const storedSeeker = JSON.parse(localStorage.getItem('seeker_session') || 'null');
+        const storedHelper = JSON.parse(localStorage.getItem('helper_session') || 'null');
+        if (storedSeeker?.session_id === sessionId) clearStoredSession('seeker');
+        if (storedHelper?.session_id === sessionId) clearStoredSession('helper');
+      } catch (e) {
+        clearStoredSession('seeker');
+        clearStoredSession('helper');
+      }
+    } else {
+      clearStoredSession('seeker');
+      clearStoredSession('helper');
+    }
+    setBannedInfo({
+      session_id: sessionId,
+      message: message || 'Your access has been restricted by a moderator.'
+    });
+    setActiveConversation(null);
+    setCurrentView('main');
+  };
+
   // Apply theme to html root
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -69,11 +96,7 @@ export function AppProvider({ children }) {
     const verifyStoredSession = async (role, parsed) => {
       const me = await api.getMe(role).catch((err) => {
         if (err?.status === 403 && err?.data?.is_banned) {
-          clearStoredSession(role);
-          setBannedInfo({
-            session_id: parsed?.session_id || null,
-            message: 'Your access has been restricted by a moderator.'
-          });
+          lockOutBanned({ role, sessionId: parsed?.session_id || null });
           return { banned: true };
         }
         return null;
@@ -165,26 +188,9 @@ export function AppProvider({ children }) {
 
     socket.on('conversation_matched', handleMatch);
 
-    // Instant moderator ban kick — lock out the matching session immediately
+    // Instant moderator ban kick — lock out immediately, no exceptions
     const handleSessionBanned = (data) => {
-      const bannedId = data?.session_id;
-      let matched = false;
-      if (bannedId && seekerSession?.session_id === bannedId) {
-        clearStoredSession('seeker');
-        matched = true;
-      }
-      if (bannedId && helperSession?.session_id === bannedId) {
-        clearStoredSession('helper');
-        matched = true;
-      }
-      if (matched || !bannedId) {
-        setBannedInfo({
-          session_id: bannedId || null,
-          message: data?.message || 'Your access has been restricted by a moderator.'
-        });
-        setCurrentView('main');
-        setActiveConversation(null);
-      }
+      lockOutBanned({ sessionId: data?.session_id || null, message: data?.message });
     };
 
     socket.on('session_banned', handleSessionBanned);
@@ -346,6 +352,7 @@ export function AppProvider({ children }) {
         hotlines,
         bannedInfo,
         setBannedInfo,
+        lockOutBanned,
         notifsEnabled,
         setNotifsEnabled
       }}

@@ -21,6 +21,30 @@ function isSessionBanned(sessionId) {
   return isSessionIdBanned(sessionId);
 }
 
+// End every live conversation of a banned session and tell the rooms,
+// so neither the banned user nor their peer is left in a working chat.
+export function endConversationsForBan(sessionId) {
+  if (!ioRef || !sessionId) return;
+  const db = getDb();
+  (db.conversations || [])
+    .filter(
+      (c) =>
+        (c.seeker_session_id === sessionId || c.helper_session_id === sessionId) &&
+        (c.status === 'active' || c.status === 'waiting')
+    )
+    .forEach((c) => {
+      c.status = 'ended';
+      c.ended_at = new Date().toISOString();
+      c.ended_by = 'moderator_ban';
+      saveConversation(c);
+      ioRef.to(`conv-${c.conversation_id}`).emit('conversation_ended', {
+        conversation_id: c.conversation_id,
+        ended_by: 'moderator_ban'
+      });
+    });
+  ioRef.emit('queue_updated');
+}
+
 // Push an instant kick to every live socket of a banned session.
 // Called from the admin report-action route so the ban takes effect immediately.
 export function notifySessionBanned(sessionId) {

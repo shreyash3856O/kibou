@@ -12,6 +12,7 @@ export default function ChatRoom() {
     helperSession,
     setCurrentView,
     setShowHotlinesModal,
+    lockOutBanned,
     theme
   } = useApp();
 
@@ -98,6 +99,7 @@ export default function ChatRoom() {
       if (!data?.session_id || data.session_id === session?.session_id) {
         setIsBanned(true);
         setConversationEnded(true);
+        lockOutBanned({ sessionId: data?.session_id || session?.session_id || null, message: data?.message });
         socket.emit('leave_conversation', {
           conversation_id: convId,
           session_id: session?.session_id,
