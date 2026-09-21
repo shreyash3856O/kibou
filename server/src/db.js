@@ -186,6 +186,12 @@ const BannedIPSchema = new mongoose.Schema({
   banned_by: String
 }, { strict: false });
 
+const BannedSessionSchema = new mongoose.Schema({
+  session_id: { type: String, unique: true, index: true },
+  banned_at: String,
+  banned_by: String
+}, { strict: false });
+
 const AuditLogSchema = new mongoose.Schema({
   log_id: { type: String, unique: true, index: true },
   admin_id: String,
@@ -220,11 +226,12 @@ export async function initializeDatabase() {
         AdminChatMessage: mongoose.models.AdminChatMessage || mongoose.model('AdminChatMessage', AdminChatMessageSchema),
         AdminUser: mongoose.models.AdminUser || mongoose.model('AdminUser', AdminUserSchema),
         BannedIP: mongoose.models.BannedIP || mongoose.model('BannedIP', BannedIPSchema),
+        BannedSession: mongoose.models.BannedSession || mongoose.model('BannedSession', BannedSessionSchema),
         AuditLog: mongoose.models.AuditLog || mongoose.model('AuditLog', AuditLogSchema)
       };
 
       // Load collections into memory
-      const [sessions, conversations, messages, reports, adminChats, adminChatMessages, adminUsers, bannedIps, auditLogs] =
+      const [sessions, conversations, messages, reports, adminChats, adminChatMessages, adminUsers, bannedIps, bannedSessions, auditLogs] =
         await Promise.all([
           Models.Session.find({}).lean(),
           Models.Conversation.find({}).lean(),
@@ -234,6 +241,7 @@ export async function initializeDatabase() {
           Models.AdminChatMessage.find({}).lean(),
           Models.AdminUser.find({}).lean(),
           Models.BannedIP.find({}).lean(),
+          Models.BannedSession.find({}).lean(),
           Models.AuditLog.find({}).lean()
         ]);
 
@@ -245,6 +253,7 @@ export async function initializeDatabase() {
       db.admin_chat_messages = adminChatMessages || [];
       db.admin_users = adminUsers || [];
       db.banned_ips = (bannedIps || []).map((b) => b.ip || b);
+      db.banned_session_ids = (bannedSessions || []).map((b) => b.session_id || b);
       db.audit_logs = auditLogs || [];
     } catch (err) {
       console.error('⚠️ MongoDB connection failed:', err.message);
@@ -377,6 +386,13 @@ export const banSessionById = (id) => {
   } else {
     saveDatabase();
   }
+  if (isMongoConnected && Models.BannedSession) {
+    Models.BannedSession.updateOne(
+      { session_id: id },
+      { session_id: id, banned_at: new Date().toISOString() },
+      { upsert: true }
+    ).catch((e) => console.error('Mongo ban sync error:', e.message));
+  }
   return session || null;
 };
 
@@ -391,6 +407,11 @@ export const unbanSessionById = (id) => {
     saveSession(session);
   } else {
     saveDatabase();
+  }
+  if (isMongoConnected && Models.BannedSession) {
+    Models.BannedSession.deleteOne({ session_id: id }).catch((e) =>
+      console.error('Mongo unban sync error:', e.message)
+    );
   }
   return session || null;
 };

@@ -222,10 +222,12 @@ export function AppProvider({ children }) {
   useEffect(() => {
     const socket = getSocket();
 
-    // Someone is seeking help — notify users holding a helper session
+    // Someone is seeking help — notify users holding a helper session.
+    // Background-only: if the tab is visible the queue already updates live.
     const handleSeekerInQueue = (data) => {
       const v = viewRef.current;
       if (!v.notifsEnabled || !v.helperSession || v.adminUser) return;
+      if (typeof document !== 'undefined' && !document.hidden) return;
       const title = 'Someone needs support';
       const body = `${data?.seeker_alias || 'A seeker'} is waiting${data?.topic ? ` — ${data.topic}` : ''}. Tap to help.`;
       fireOsNotification(title, body, 'kibou-seeker-queue');
@@ -239,10 +241,12 @@ export function AppProvider({ children }) {
       });
     };
 
-    // New chat message (peer or Sukhi) — skip own messages and the open chat
+    // New chat message (peer or Sukhi) — background-only. If the tab is
+    // visible the message is already on screen, so stay silent.
     const handleChatMessage = (msg) => {
       const v = viewRef.current;
       if (!v.notifsEnabled || !msg) return;
+      if (typeof document !== 'undefined' && !document.hidden) return;
       const ownIds = [v.seekerSession?.session_id, v.helperSession?.session_id].filter(Boolean);
       if (ownIds.includes(msg.sender_session_id)) return;
       if (v.currentView === 'chat' && v.activeConversation?.conversation_id === msg.conversation_id) return;
