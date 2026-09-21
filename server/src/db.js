@@ -257,6 +257,14 @@ export async function initializeDatabase() {
       db.audit_logs = auditLogs || [];
     } catch (err) {
       console.error('⚠️ MongoDB connection failed:', err.message);
+      const msg = (err.message || '').toLowerCase();
+      if (msg.includes('bad auth') || msg.includes('authentication failed')) {
+        console.error('🔐 Auth checklist (URI is never logged):');
+        console.error('   1. URL-encode special chars in the DB password (@ → %40, / → %2F, : → %3A, ? → %3F, # → %23, % → %25).');
+        console.error('   2. Atlas → Database Access: user exists with readWrite on the target database.');
+        console.error('   3. Atlas → Network Access: allow 0.0.0.0/0 so Render can connect.');
+        console.error('   4. No leading/trailing spaces in the MONGODB_URI value on Render.');
+      }
       console.log('🔄 Falling back to local JSON database storage.');
       loadLocalJson();
     }

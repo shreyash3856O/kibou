@@ -10,16 +10,26 @@ self.addEventListener('push', (event) => {
     }
   } catch (e) {}
 
-  const options = {
-    body: data.body,
-    icon: '/kibou-logo.png',
-    badge: '/kibou-logo.png',
-    tag: data.tag || 'kibou',
-    renotify: true,
-    data: { url: data.url || '/' }
-  };
+  event.waitUntil(
+    (async () => {
+      // Foreground rule: if any app tab is visible, stay silent —
+      // the open screen already shows everything live.
+      try {
+        const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+        if (windows.some((c) => c.visibilityState === 'visible')) return;
+      } catch (e) {}
 
-  event.waitUntil(self.registration.showNotification(data.title || 'Kibou', options));
+      const options = {
+        body: data.body,
+        icon: '/kibou-logo.png',
+        badge: '/kibou-logo.png',
+        tag: data.tag || 'kibou',
+        renotify: true,
+        data: { url: data.url || '/' }
+      };
+      return self.registration.showNotification(data.title || 'Kibou', options);
+    })()
+  );
 });
 
 self.addEventListener('notificationclick', (event) => {
