@@ -1,77 +1,81 @@
-# Seeker 🌿
+# Kibou
 
-Anonymous peer mental health and crisis support platform. Built with a clean, mobile-first design, end-to-end AES-256 chat encryption, real-time crisis detection keywords, faculty counseling escalation, and a 2FA-secured counselor moderation panel.
+Anonymous peer mental health support for students. No name, no account, no waiting — just someone there.
 
----
-
-## 🚀 One-Click Deploy to Render
-
-Seeker is structured as a unified full-stack application (Express + React Vite + Socket.io WebSockets) that runs on a single port.
-
-### Step 1: Create a Web Service on Render
-1. Go to [Render Dashboard](https://dashboard.render.com/) and click **New +** → **Web Service**.
-2. Select **Build and deploy from a Git repository** and connect your GitHub repository: `shreyash3856O/kibou`.
-
-### Step 2: Configure Service Settings
-- **Name**: `seeker-app` (or your preferred name)
-- **Language**: `Node`
-- **Branch**: `main`
-- **Region**: Any (e.g., `Oregon (US West)` or `Frankfurt (EU)`)
-- **Build Command**:
-  ```bash
-  npm install && npm run build
-  ```
-- **Start Command**:
-  ```bash
-  npm start
-  ```
-- **Plan**: `Free`
-
-### Step 3: Set Environment Variables on Render
-Under the **Environment Variables** tab in your Render Web Service settings, add:
-
-| Key | Example / Recommended Value | Description |
-|---|---|---|
-| `NODE_ENV` | `production` | Enables production optimizations |
-| `PORT` | `5000` | Server listening port |
-| `JWT_SECRET` | `seeker_super_secure_jwt_secret_2026` | Random secure string for authentication tokens |
-| `ENCRYPTION_KEY` | `0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef` | 64-character hex key for AES-256 message encryption |
-| `MONGODB_URI` *(Recommended)* | `mongodb+srv://user:pass@cluster.mongodb.net/seeker` | MongoDB Atlas URI for persistent database storage (see below) |
-
-> **Note on Database**: If `MONGODB_URI` is provided, Seeker automatically saves all sessions, conversations, messages, reports, and counselor chats to MongoDB. If `MONGODB_URI` is not set, Seeker automatically runs with local JSON storage.
+Kibou matches students who need to vent with volunteer peer helpers in real time, or with **Sukhi**, a 24/7 AI companion that understands Hinglish and only ever talks about what you're actually feeling. Everything runs encrypted, counselors moderate from a secured panel, and crisis moments escalate to real helplines.
 
 ---
 
-## 🗄️ Setting Up Free MongoDB Atlas (Optional but Recommended)
+## What it does
 
-1. Create a free account at [MongoDB Atlas](https://www.mongodb.com/cloud/atlas).
-2. Create a free **M0 Shared Cluster**.
-3. Under **Database Access**, create a database user and password.
-4. Under **Network Access**, click **Add IP Address** → choose **Allow Access From Anywhere (`0.0.0.0/0`)** so Render can connect.
-5. Click **Connect** → **Drivers** → copy the connection string (e.g. `mongodb+srv://<username>:<password>@cluster0.xxx.mongodb.net/seeker?retryWrites=true&w=majority`).
-6. Paste it as `MONGODB_URI` in Render environment variables.
-
----
-
-## 🩺 Default Counselor Admin Credentials
-
-- **Email**: `counselor@school.edu`
-- **Password**: `AdminPass123!`
-- **2FA Code**: `123456`
+- **Seeker ↔ Helper matching** — pick a topic (Academic Stress, Anxiety & Panic, Relationships, Family Issues, Loneliness, General Venting), get matched live over WebSockets.
+- **Sukhi (AI Companion)** — Groq-powered peer listener with a strict mental-health-only scope: it reflects feelings, never tutors, never answers homework, and redirects off-topic questions back to how you're doing. Full Hinglish comprehension.
+- **End-to-end AES-256 chat encryption**, crisis-keyword detection with instant Tele-MANAS / KIRAN escalation, faculty-counselor escalation channel.
+- **Counselor moderation panel** — UID + password + 2FA login, report transcripts, warn/ban with instant live kick, session + IP bans, audit logs, AI engine status and key management.
+- **Notifications that actually reach you** — header bell toggle, in-app toasts, OS notifications, and background Web Push (VAPID + service worker) for help requests and chat messages, even with the browser closed.
+- **Thoughtful touches** — animated thinking-orb typing states, breathing exercise modal, sticky compact chat bar on mobile, dark/light themes, persistent bans that survive restarts.
 
 ---
 
-## 💻 Local Development
+## Stack
+
+Express + Socket.io backend, React + Vite frontend, MongoDB Atlas when configured with automatic fallback to local JSON storage. Zero-dependency client orb (`thinking-orbs`), `web-push` for background alerts.
+
+---
+
+## Run it locally
 
 ```bash
-# 1. Install all dependencies (client and server)
+# 1. Install everything (root, server, client)
 npm run install:all
 
-# 2. Build the client
-npm run build
+# 2. Configure environment
+cp .env.example server/.env
+# then fill in: JWT_SECRET, ENCRYPTION_KEY, GROQ_API_KEY (console.groq.com/keys),
+# VAPID_* (generate via the command in .env.example), MONGODB_URI (optional)
 
-# 3. Start the unified server
+# 3. Build + start
+npm run build
 npm start
 
-# App will be accessible at http://localhost:5000
+# App at http://localhost:5000 (client dev server: npm run dev in /client → :3000)
 ```
+
+---
+
+## Deploy to Render
+
+1. New Web Service from this repo (`main`), Node, Free plan.
+2. Build: `npm install && npm run build` · Start: `npm start`.
+3. Set env vars: `NODE_ENV=production`, `PORT=5000`, `JWT_SECRET`, `ENCRYPTION_KEY` (64-char hex), `GROQ_API_KEY`, `VAPID_SUBJECT`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `MONGODB_URI` (recommended — without it, Render's ephemeral disk wipes sessions, bans, and history on every restart).
+
+Free MongoDB Atlas M0 works: create a cluster + db user, allow `0.0.0.0/0` under Network Access, paste the connection string as `MONGODB_URI`.
+
+---
+
+## Default counselor login
+
+- **UID:** `shreyyay`
+- **Password:** `100`
+- **2FA code:** `100`
+
+Change these before any public deployment.
+
+---
+
+## Project layout
+
+```
+client/                 React + Vite frontend
+  src/views/            SeekerDashboard, HelperDashboard, ChatRoom, AdminPanel
+  src/components/       Header, ToastStack, NotificationBell, modals
+  src/services/         api, socket, notifications (toast + push bus)
+  public/sw.js          service worker for background push
+server/                 Express + Socket.io backend
+  src/index.js          entrypoint · src/socket.js  realtime + ban enforcement
+  src/routes.js         REST API · src/sukhi.js  AI companion engine
+  src/push.js           Web Push delivery · src/db.js  JSON/Mongo store
+brag-output/            launch video (brag.mp4), poster, plan, composition
+```
+
+Built for the nights when your brain won't shut up. If it helps one student feel heard at 2am, it worked.
