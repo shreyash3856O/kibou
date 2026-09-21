@@ -100,7 +100,8 @@ export default function SeekerDashboard() {
         conversation_id: res.conversation.conversation_id,
         topic: selectedTopic,
         initial_prompt: promptText,
-        seeker_alias: session.alias
+        seeker_alias: session.alias,
+        seeker_session_id: session.session_id
       });
 
       if (res.conversation.status === 'active') {

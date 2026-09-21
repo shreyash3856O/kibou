@@ -114,7 +114,14 @@ export function setupSocketIO(io) {
     });
 
     // Seeker requests queue entry
-    socket.on('seeker_queue_enter', ({ conversation_id, topic, initial_prompt, seeker_alias }) => {
+    socket.on('seeker_queue_enter', ({ conversation_id, topic, initial_prompt, seeker_alias, seeker_session_id }) => {
+      if (isSessionBanned(seeker_session_id || socket.session_id)) {
+        socket.emit('session_banned', {
+          session_id: seeker_session_id || socket.session_id,
+          message: 'Your access has been restricted by a moderator.'
+        });
+        return;
+      }
       socket.join(`conv-${conversation_id}`);
       // Broadcast to all online helpers immediately
       io.to('helpers_channel').emit('new_seeker_in_queue', {
@@ -131,6 +138,13 @@ export function setupSocketIO(io) {
 
     // Helper accepts seeker match
     socket.on('helper_accepted_match', ({ conversation_id, helper_session_id, helper_alias }) => {
+      if (isSessionBanned(helper_session_id || socket.session_id)) {
+        socket.emit('session_banned', {
+          session_id: helper_session_id || socket.session_id,
+          message: 'Your access has been restricted by a moderator.'
+        });
+        return;
+      }
       const room = `conv-${conversation_id}`;
       socket.join(room);
 
@@ -356,6 +370,11 @@ export function setupSocketIO(io) {
           conversation_id,
           escalated_by,
           role,
+          // Call-routing context for clients: severity, AI chat, participants
+          is_severe: Boolean(conv.is_crisis_flagged),
+          is_ai: Boolean(conv.is_ai || conv.helper_session_id === SUKHI_SESSION_ID),
+          seeker_session_id: conv.seeker_session_id || null,
+          helper_session_id: conv.helper_session_id || null,
           message: 'This conversation was escalated to on-call campus counselors. Staff have been notified.'
         });
 

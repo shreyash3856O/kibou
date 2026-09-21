@@ -3,6 +3,7 @@ import { ThinkingOrb } from 'thinking-orbs';
 import { useApp } from '../context/AppContext';
 import { api } from '../services/api';
 import { getSocket } from '../services/socket';
+import EscalationCallSheet from '../components/EscalationCallSheet';
 
 export default function ChatRoom() {
   const {
@@ -33,6 +34,8 @@ export default function ChatRoom() {
   const [reportDescription, setReportDescription] = useState('');
   const [conversationEnded, setConversationEnded] = useState(false);
   const [isBanned, setIsBanned] = useState(false);
+  const [callSheet, setCallSheet] = useState(null);
+  const callAutoOpenedRef = useRef(false);
 
   const messagesEndRef = useRef(null);
   const messagesRef = useRef(null);
@@ -78,6 +81,12 @@ export default function ChatRoom() {
     socket.on('crisis_detected', (data) => {
       if (data.conversation_id === convId) {
         setIsCrisisActive(true);
+        // Severe signal: offer direct call options (sheet only, no auto-dial)
+        setCallSheet((prev) => prev || {
+          mode: 'helplines',
+          reason: 'This chat shows signs of crisis. You can reach a trained counselor right now — one tap opens your dialer.',
+          autoUrl: null
+        });
       }
     });
 
@@ -104,9 +113,35 @@ export default function ChatRoom() {
     });
 
     socket.on('conversation_escalated', (data) => {
-      if (data.conversation_id === convId) {
-        setIsCrisisActive(true);
+      if (data.conversation_id !== convId) return;
+      setIsCrisisActive(true);
+
+      const iAmEscalator = Boolean(data.escalated_by && data.escalated_by === session?.session_id);
+      const isAi = Boolean(activeConversation?.is_ai || activeConversation?.helper_session_id === 'sukhi_ai_helper');
+      const severe = Boolean(data.is_severe);
+
+      let mode;
+      let reason;
+      let autoUrl = null;
+      if (severe || isAi) {
+        // Severe chats and AI chats route to professional helplines
+        mode = 'helplines';
+        reason = severe
+          ? 'This chat was escalated as a crisis. Tap once — your dialer opens with a 24/7 helpline ready.'
+          : 'This chat was escalated. Tap once — your dialer opens with a 24/7 helpline ready.';
+        if (!iAmEscalator) autoUrl = 'tel:14416';
+      } else if (!iAmEscalator) {
+        // Peer escalated: the other person's phone goes to Shreyash on WhatsApp
+        mode = 'whatsapp';
+        reason = 'Your peer escalated this chat to get you help. Your WhatsApp opens straight to Shreyash — just press send.';
+        autoUrl = 'https://wa.me/917304167033?text=' + encodeURIComponent('Hi, I need support. My Kibou conversation was just escalated.');
+      } else {
+        mode = 'all';
+        reason = 'You escalated this chat. Call or message support directly, or stay here — counselors have been notified.';
       }
+
+      callAutoOpenedRef.current = false;
+      setCallSheet({ mode, reason, autoUrl });
     });
 
     return () => {
@@ -128,6 +163,16 @@ export default function ChatRoom() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isPeerTyping]);
+
+  // Auto-open the dialer / WhatsApp once per escalation (sheet stays as fallback)
+  useEffect(() => {
+    if (callSheet?.autoUrl && !callAutoOpenedRef.current) {
+      callAutoOpenedRef.current = true;
+      try {
+        window.location.href = callSheet.autoUrl;
+      } catch (e) {}
+    }
+  }, [callSheet]);
 
   // Catch up on anything missed while the tab was hidden or socket dropped:
   // rejoin the room and reload messages on foreground / focus / reconnect.
@@ -418,6 +463,9 @@ export default function ChatRoom() {
           </div>
         </div>
       )}
+
+      {/* Escalation call sheet — one-tap dialer / WhatsApp */}
+      <EscalationCallSheet sheet={callSheet} onClose={() => setCallSheet(null)} />
 
     </div>
   );

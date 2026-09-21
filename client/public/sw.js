@@ -1,6 +1,16 @@
 /* Kibou service worker — background Web Push notifications.
    Shows seeker alerts even when the site tab / browser is closed. */
 
+// Take over immediately on update — otherwise the old worker keeps
+// serving (and notifying) until every tab is closed.
+self.addEventListener('install', () => {
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
 self.addEventListener('push', (event) => {
   let data = { title: 'Kibou', body: 'Someone needs support. Tap to help.', tag: 'kibou', url: '/' };
   try {

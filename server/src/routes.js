@@ -231,7 +231,7 @@ router.post('/auth/admin/2fa/verify', (req, res) => {
 router.get('/helpers/available', (req, res) => {
   const db = getDb();
   const helpers = (db.sessions || [])
-    .filter((s) => s.user_role === 'helper' && s.is_available && !s.is_banned)
+    .filter((s) => s.user_role === 'helper' && s.is_available && !s.is_banned && !isSessionIdBanned(s.session_id))
     .map((h) => ({
       session_id: h.session_id,
       alias: h.alias,
@@ -243,6 +243,9 @@ router.get('/helpers/available', (req, res) => {
 
 router.post('/helpers/status', async (req, res) => {
   const { session_id, is_available } = req.body;
+  if (is_available && isSessionIdBanned(session_id)) {
+    return res.status(403).json({ error: 'Account restricted', is_banned: true });
+  }
   let session = findSessionById(session_id);
   if (!session && session_id) {
     session = await findOrRecoverSession(session_id, 'helper');
@@ -446,6 +449,10 @@ router.post('/conversations/:id/accept', async (req, res) => {
       });
     }
 
+    if (isSessionIdBanned(helper_session_id)) {
+      return res.status(403).json({ error: 'Account restricted', is_banned: true });
+    }
+
     let helper = findSessionById(helper_session_id);
     if (!helper && helper_session_id) {
       helper = await findOrRecoverSession(helper_session_id, 'helper', helper_alias || 'Helper');
@@ -453,6 +460,10 @@ router.post('/conversations/:id/accept', async (req, res) => {
 
     if (!helper) {
       return res.status(404).json({ error: 'Helper session not found' });
+    }
+
+    if (helper.is_banned) {
+      return res.status(403).json({ error: 'Account restricted', is_banned: true });
     }
 
     conversation.helper_session_id = helper.session_id;
