@@ -1,4 +1,5 @@
 # Kibou
+kibou.onrender.com
 
 Anonymous peer mental health support for students. No name, no account, no waiting — just someone there.
 
@@ -52,14 +53,6 @@ npm start
 Free MongoDB Atlas M0 works: create a cluster + db user, allow `0.0.0.0/0` under Network Access, paste the connection string as `MONGODB_URI`.
 
 ---
-
-## Default counselor login
-
-- **UID:** `shreyyay`
-- **Password:** `100`
-- **2FA code:** `100`
-
-Change these before any public deployment.
 
 ---
 
